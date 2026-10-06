@@ -1,0 +1,3 @@
+[submodule "agy_mcp"]
+	path = agy_mcp
+	url = https://github.com/Dheerax/agy_mcp.git
