@@ -114,8 +114,8 @@ main {
 }
 
 .btn-dark {
-  background: #020403;
-  color: var(--text-strong);
+  background: var(--ink);
+  color: var(--ink-text);
   border-color: rgba(255, 255, 255, 0.1);
   box-shadow: var(--shadow-float);
 }
@@ -323,7 +323,7 @@ a.pill:hover {
 
 .message-info {
   background: var(--accent-soft);
-  border-color: rgba(185, 242, 91, 0.25);
+  border-color: color-mix(in srgb, var(--accent) 25%, transparent);
   color: var(--accent-strong);
 }
 
@@ -509,6 +509,38 @@ a.pill:hover {
   box-shadow: inset 0 0 0 1px var(--border-strong);
 }
 
+.theme-toggle {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--accent);
+  cursor: pointer;
+  transition: transform 0.3s var(--ease-spring), border-color 0.2s ease, box-shadow 0.25s ease;
+}
+
+.theme-toggle:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft), 0 0 20px -4px var(--accent-glow);
+  transform: rotate(-12deg) scale(1.06);
+}
+
+.theme-icon {
+  display: grid;
+  animation: theme-icon-in 0.5s var(--ease-spring);
+}
+
+@keyframes theme-icon-in {
+  from {
+    opacity: 0;
+    transform: rotate(-120deg) scale(0.4);
+  }
+}
+
 .nav-auth {
   display: none;
   gap: 0.4rem;
@@ -673,9 +705,34 @@ a.pill:hover {
   }
 }
 
+.currency-switch button {
+  display: inline-flex;
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+/* Phones: the code goes, the symbol stays, so the top bar fits on one line. */
+@media (max-width: 480px) {
+  .currency-code {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .navbar-inner {
+    gap: 0.5rem;
+  }
+
+  .nav-tools {
+    gap: 0.35rem;
+  }
+}
+
 @media (max-width: 420px) {
   .currency-switch button {
-    padding: 0.3rem 0.5rem;
+    padding: 0.3rem 0.55rem;
   }
 
   .wordmark {
@@ -844,7 +901,7 @@ a.pill:hover {
 
 .panel {
   position: relative;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 40%), var(--surface);
+  background: linear-gradient(180deg, var(--sheen), transparent 40%), var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 1.5rem;
@@ -903,10 +960,14 @@ a.pill:hover {
 }
 
 .hero-title {
-  font-size: clamp(2.6rem, 7.5vw, 5.4rem);
+  font-size: clamp(2.4rem, 6.4vw, 4.75rem);
   line-height: 0.98;
   letter-spacing: -0.045em;
   margin-bottom: 1.5rem;
+}
+
+.hero-title .nowrap {
+  white-space: nowrap;
 }
 
 .hero-title .strong {
@@ -916,7 +977,7 @@ a.pill:hover {
 
 .hero-title .thin {
   font-weight: 200;
-  color: rgba(214, 255, 170, 0.62);
+  color: var(--headline-thin);
 }
 
 .hero-title .accent {
@@ -1019,14 +1080,14 @@ a.pill:hover {
   position: absolute;
   inset: 12%;
   border-radius: 50%;
-  border: 1px dashed rgba(214, 255, 170, 0.18);
+  border: 1px dashed color-mix(in srgb, var(--accent) 18%, transparent);
   animation: seal-spin 60s linear infinite;
 }
 
 .orbit-ring-2 {
   inset: 30%;
   border-style: solid;
-  border-color: rgba(214, 255, 170, 0.08);
+  border-color: color-mix(in srgb, var(--accent) 8%, transparent);
   animation-direction: reverse;
   animation-duration: 40s;
 }
@@ -1036,8 +1097,15 @@ a.pill:hover {
   left: 50%;
   top: 50%;
   translate: -50% -50%;
-  filter: drop-shadow(0 0 40px rgba(163, 230, 53, 0.45));
+  filter: drop-shadow(0 0 40px color-mix(in srgb, var(--accent) 45%, transparent));
   animation: bob 5s ease-in-out infinite;
+}
+
+/* The ring turns once a minute; each pill counter-turns at the same rate to stay upright. */
+.orbit-track {
+  position: absolute;
+  inset: 0;
+  animation: orbit-spin 60s linear infinite;
 }
 
 .orbit-tile {
@@ -1045,6 +1113,15 @@ a.pill:hover {
   position: absolute;
   left: 50%;
   top: 50%;
+  transform: translate(-50%, -50%) rotate(var(--angle)) translateX(min(38vw, 190px)) rotate(calc(-1 * var(--angle)));
+}
+
+.orbit-upright {
+  display: block;
+  animation: orbit-spin 60s linear infinite reverse;
+}
+
+.orbit-pill {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
@@ -1058,9 +1135,35 @@ a.pill:hover {
   font-size: 0.82rem;
   font-weight: 600;
   white-space: nowrap;
-  transform: translate(-50%, -50%) rotate(var(--angle)) translateX(min(38vw, 190px)) rotate(calc(-1 * var(--angle)));
-  animation: bob 6s ease-in-out infinite;
-  animation-delay: calc(var(--i) * -0.7s);
+  animation:
+    orbit-pop 0.7s var(--ease-spring) both,
+    bob 6s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 70ms), calc(var(--i) * -0.7s);
+}
+
+/* "Reduce motion" stops every other animation on the site, but the ring keeps its slow
+   one-turn-a-minute revolution (only the bob and pop-in stop), because the tool names swap
+   with each turn. */
+@media (prefers-reduced-motion: reduce) {
+  .orbit-track,
+  .orbit-upright {
+    animation-duration: 60s !important;
+    animation-iteration-count: infinite !important;
+  }
+}
+
+@keyframes orbit-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+@keyframes orbit-pop {
+  from {
+    opacity: 0;
+    scale: 0.4;
+    filter: blur(6px);
+  }
 }
 
 .orbit-tile .tool-logo {
@@ -1144,12 +1247,27 @@ a.pill:hover {
   border-radius: 50%;
   background: var(--accent-soft);
   color: var(--accent);
-  border: 1px solid rgba(185, 242, 91, 0.25);
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
 .feature-dark {
   justify-content: flex-start;
-  background: #020403;
+  background: var(--ink);
+  color: var(--ink-text);
+}
+
+.feature-dark strong {
+  color: var(--ink-text);
+}
+
+.feature-dark .feature-small {
+  color: color-mix(in srgb, var(--ink-text) 65%, transparent);
+}
+
+/* Pastel category colours are made for dark backgrounds; on white they are deepened. */
+:root[data-theme='light'] .category-badge {
+  color: color-mix(in srgb, var(--badge, var(--accent)) 45%, #0a1a26);
+  background: color-mix(in srgb, var(--badge, var(--accent)) 28%, transparent);
 }
 
 .feature-big {
@@ -1290,7 +1408,7 @@ a.pill:hover {
 .cat-data { --badge: #86efac; }
 .cat-marketing { --badge: #f0abfc; }
 .cat-automation { --badge: #cbd5e1; }
-.cat-chatbots { --badge: #bef264; }
+.cat-chatbots { --badge: #a7f3d0; }
 
 .category-grid {
   display: grid;
@@ -1354,7 +1472,7 @@ a.pill:hover {
 }
 
 .feature-dark .logo-stack .tool-logo {
-  border-color: #020403;
+  border-color: var(--ink);
 }
 
 /* ---------- Cards: tilt + spotlight (driven by effects.js) ---------------------------------- */
@@ -1366,7 +1484,7 @@ a.pill:hover {
   --rx: 0deg;
   --ry: 0deg;
   position: relative;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 45%), var(--surface);
+  background: linear-gradient(180deg, var(--sheen), transparent 45%), var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   transform: perspective(900px) rotateX(var(--rx)) rotateY(var(--ry));
@@ -1396,7 +1514,7 @@ a.pill:hover {
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.3s ease;
-  background: radial-gradient(360px circle at var(--mx, 50%) var(--my, 50%), rgba(190, 242, 100, 0.12), transparent 45%);
+  background: radial-gradient(360px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--accent) 12%, transparent), transparent 45%);
 }
 
 .product-card:hover::before,
@@ -1409,8 +1527,8 @@ a.pill:hover {
 
 .product-card:hover,
 .category-card:hover {
-  border-color: rgba(190, 242, 100, 0.3);
-  box-shadow: 0 24px 50px -20px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(190, 242, 100, 0.08);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  box-shadow: 0 24px 50px -20px rgba(0, 0, 0, 0.8), 0 0 0 1px color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 /* ---------- Tool logos & product cards ----------------------------------------------------- */
@@ -2129,7 +2247,7 @@ a.pill:hover {
 
 .auth-head svg {
   margin-bottom: 0.75rem;
-  filter: drop-shadow(0 0 24px rgba(163, 230, 53, 0.4));
+  filter: drop-shadow(0 0 24px color-mix(in srgb, var(--accent) 40%, transparent));
 }
 
 .auth-head h1 {
@@ -2233,7 +2351,7 @@ a.pill:hover {
 
 .chat-welcome svg {
   margin-bottom: 0.75rem;
-  filter: drop-shadow(0 0 30px rgba(163, 230, 53, 0.45));
+  filter: drop-shadow(0 0 30px color-mix(in srgb, var(--accent) 45%, transparent));
   animation: bob 5s ease-in-out infinite;
 }
 
@@ -2792,11 +2910,11 @@ a.pill:hover {
 
 @keyframes live {
   70% {
-    box-shadow: 0 0 0 10px rgba(185, 242, 91, 0);
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--accent) 0%, transparent);
   }
 
   100% {
-    box-shadow: 0 0 0 0 rgba(185, 242, 91, 0);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent);
   }
 }
 
@@ -2847,7 +2965,7 @@ a.pill:hover {
 
 .kpi-live {
   background: var(--hero-gradient);
-  border-color: rgba(190, 242, 100, 0.3);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 .kpi-live strong {
@@ -2906,7 +3024,7 @@ a.pill:hover {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #4d7c0f, var(--accent));
+  background: linear-gradient(90deg, var(--accent-deep), var(--accent));
   box-shadow: 0 0 12px var(--accent-glow);
   transition: width 0.6s ease;
 }
@@ -3059,7 +3177,7 @@ a.pill:hover {
   padding: 1.4rem;
   border-radius: 26px;
   background: var(--hero-gradient);
-  border: 1px solid rgba(190, 242, 100, 0.3);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
   box-shadow: var(--shadow-lg), 0 0 60px -20px var(--accent-glow);
   animation: toast-in 0.6s var(--ease-spring) both;
 }
@@ -3166,7 +3284,7 @@ a.pill:hover {
 }
 
 .sheet::backdrop {
-  background: rgba(2, 4, 3, 0.7);
+  background: var(--scrim);
   backdrop-filter: blur(6px);
 }
 
@@ -3221,7 +3339,7 @@ a.pill:hover {
 .site-footer {
   margin-top: 2rem;
   border-top: 1px solid var(--border);
-  background: linear-gradient(180deg, transparent, rgba(20, 83, 45, 0.18));
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--accent-deep) 16%, transparent));
   padding: 2.25rem 1rem calc(6.5rem + env(safe-area-inset-bottom, 0px));
 }
 

@@ -1,37 +1,45 @@
 /* Design tokens and element defaults. Component styles live in App.css.
-   One theme only: deep forest-green darkness with a lime accent. */
+   Two themes, cyan on both: dark (the default) and light, switched by data-theme on <html>.
+   Every colour in App.css comes from these tokens, so a theme is just this block. */
 
 :root {
-  --bg: #060a07;
-  --bg-glow: radial-gradient(1200px 600px at 85% -10%, rgba(132, 204, 22, 0.13), transparent 60%),
-    radial-gradient(900px 500px at -10% 20%, rgba(20, 83, 45, 0.35), transparent 60%);
-  --surface: #0d140f;
-  --surface-2: #131d16;
-  --surface-3: #1a271e;
-  --glass: rgba(14, 22, 16, 0.62);
-  --glass-strong: rgba(10, 16, 12, 0.82);
-  --border: rgba(206, 255, 180, 0.08);
-  --border-strong: rgba(206, 255, 180, 0.16);
-  --text: #b8c4b6;
-  --text-strong: #f2f7ee;
-  --text-muted: #7d8c7d;
-  --accent: #b9f25b;
-  --accent-strong: #d3ff7f;
-  --accent-soft: rgba(185, 242, 91, 0.12);
-  --accent-glow: rgba(185, 242, 91, 0.35);
-  --accent-contrast: #0b1405;
-  --teal: #4fd8b8;
-  --teal-soft: rgba(79, 216, 184, 0.13);
-  --success: #82e3a8;
-  --success-soft: rgba(130, 227, 168, 0.12);
-  --warning: #f6c757;
-  --warning-soft: rgba(246, 199, 87, 0.13);
-  --danger: #ff8f80;
-  --danger-soft: rgba(255, 143, 128, 0.12);
-  --brand-gradient: linear-gradient(135deg, #15803d 0%, #65a30d 55%, #bef264 100%);
-  --hero-gradient: radial-gradient(120% 90% at 80% 20%, rgba(190, 242, 100, 0.22), transparent 55%),
-    radial-gradient(80% 80% at 10% 100%, rgba(21, 128, 61, 0.45), transparent 60%),
-    linear-gradient(160deg, #0f2a17 0%, #0a170e 55%, #060a07 100%);
+  /* Dark: deep navy with a cyan accent. */
+  --bg: #050a10;
+  --bg-glow: radial-gradient(1200px 600px at 85% -10%, rgba(34, 211, 238, 0.13), transparent 60%),
+    radial-gradient(900px 500px at -10% 20%, rgba(14, 116, 144, 0.3), transparent 60%);
+  --surface: #0b131b;
+  --surface-2: #111c26;
+  --surface-3: #182633;
+  --glass: rgba(11, 19, 27, 0.62);
+  --glass-strong: rgba(7, 13, 19, 0.84);
+  --border: rgba(165, 243, 252, 0.08);
+  --border-strong: rgba(165, 243, 252, 0.16);
+  --text: #b3c3cf;
+  --text-strong: #eef7fb;
+  --text-muted: #7a8d9b;
+  --accent: #22d3ee;
+  --accent-strong: #67e8f9;
+  --accent-deep: #0e7490;
+  --accent-soft: rgba(34, 211, 238, 0.12);
+  --accent-glow: rgba(34, 211, 238, 0.35);
+  --accent-contrast: #031219;
+  --headline-thin: rgba(165, 243, 252, 0.6);
+  --ink: #02060a;
+  --ink-text: #eef7fb;
+  --scrim: rgba(2, 6, 10, 0.72);
+  --teal: #5eead4;
+  --teal-soft: rgba(94, 234, 212, 0.13);
+  --success: #6ee7b7;
+  --success-soft: rgba(110, 231, 183, 0.12);
+  --warning: #fbbf24;
+  --warning-soft: rgba(251, 191, 36, 0.13);
+  --danger: #fb8a7e;
+  --danger-soft: rgba(251, 138, 126, 0.12);
+  --brand-gradient: linear-gradient(135deg, #0e4a5c 0%, #0891b2 55%, #67e8f9 100%);
+  --hero-gradient: radial-gradient(120% 90% at 80% 20%, rgba(34, 211, 238, 0.2), transparent 55%),
+    radial-gradient(80% 80% at 10% 100%, rgba(14, 116, 144, 0.42), transparent 60%),
+    linear-gradient(160deg, #0b2735 0%, #08151f 55%, #050a10 100%);
+  --sheen: rgba(255, 255, 255, 0.03);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
   --shadow-md: 0 14px 34px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.6);
@@ -41,12 +49,13 @@
   --radius-lg: 24px;
   --max-width: 1240px;
   --nav-height: 72px;
-  --display: 'Outfit', 'Segoe UI', system-ui, sans-serif;
-  --sans: 'Outfit', 'Segoe UI', system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+  --display: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
+  --sans: 'Inter', 'Segoe UI', system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
   --ease-spring: cubic-bezier(0.22, 1.4, 0.36, 1);
 
   color-scheme: dark;
   font-family: var(--sans);
+  font-feature-settings: 'cv11', 'ss01';
   font-size: 16px;
   line-height: 1.55;
   color: var(--text);
@@ -54,10 +63,67 @@
   -webkit-font-smoothing: antialiased;
 }
 
+/* Light: cool white with the same cyan, a shade deeper so it reads on white. */
+:root[data-theme='light'] {
+  --bg: #f3f8fb;
+  --bg-glow: radial-gradient(1200px 600px at 85% -10%, rgba(6, 182, 212, 0.12), transparent 60%),
+    radial-gradient(900px 500px at -10% 20%, rgba(14, 165, 233, 0.08), transparent 60%);
+  --surface: #ffffff;
+  --surface-2: #eef5f9;
+  --surface-3: #dfeaf1;
+  --glass: rgba(255, 255, 255, 0.7);
+  --glass-strong: rgba(255, 255, 255, 0.9);
+  --border: rgba(8, 47, 73, 0.09);
+  --border-strong: rgba(8, 47, 73, 0.16);
+  --text: #3a4b58;
+  --text-strong: #0a1a26;
+  --text-muted: #64788a;
+  --accent: #0891b2;
+  --accent-strong: #0e7490;
+  --accent-deep: #155e75;
+  --accent-soft: rgba(8, 145, 178, 0.1);
+  --accent-glow: rgba(8, 145, 178, 0.28);
+  --accent-contrast: #ffffff;
+  --headline-thin: rgba(14, 116, 144, 0.72);
+  --ink: #0a1a26;
+  --ink-text: #f3f8fb;
+  --scrim: rgba(10, 26, 38, 0.45);
+  --teal: #0f766e;
+  --teal-soft: rgba(15, 118, 110, 0.1);
+  --success: #047857;
+  --success-soft: rgba(4, 120, 87, 0.1);
+  --warning: #b45309;
+  --warning-soft: rgba(217, 119, 6, 0.12);
+  --danger: #c2410c;
+  --danger-soft: rgba(194, 65, 12, 0.1);
+  --hero-gradient: radial-gradient(120% 90% at 80% 20%, rgba(34, 211, 238, 0.25), transparent 55%),
+    radial-gradient(80% 80% at 10% 100%, rgba(125, 211, 252, 0.3), transparent 60%),
+    linear-gradient(160deg, #e6f7fc 0%, #f4fbfe 55%, #ffffff 100%);
+  --sheen: rgba(255, 255, 255, 0);
+  --shadow-sm: 0 1px 2px rgba(10, 26, 38, 0.06);
+  --shadow-md: 0 12px 30px rgba(10, 26, 38, 0.08);
+  --shadow-lg: 0 24px 60px rgba(10, 26, 38, 0.14);
+  --shadow-float: 0 10px 28px rgba(10, 26, 38, 0.1), 0 2px 6px rgba(10, 26, 38, 0.06);
+
+  color-scheme: light;
+}
+
 *,
 *::before,
 *::after {
   box-sizing: border-box;
+}
+
+/* The theme switch fades colours instead of snapping (added only while switching). */
+.theme-switching,
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
+  transition:
+    background-color 0.4s ease,
+    color 0.4s ease,
+    border-color 0.4s ease,
+    fill 0.4s ease !important;
 }
 
 body {
@@ -80,8 +146,8 @@ h3 {
   color: var(--text-strong);
   line-height: 1.1;
   margin: 0 0 0.5rem;
-  letter-spacing: -0.025em;
-  font-weight: 600;
+  letter-spacing: -0.022em;
+  font-weight: 700;
 }
 
 h1 {

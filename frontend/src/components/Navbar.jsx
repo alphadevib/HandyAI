@@ -4,6 +4,7 @@ import { usePrefs } from '../context/PrefsContext'
 import { Link, navigate, useRoute } from '../router'
 import { BrandMark, Wordmark } from './Brand'
 import { Icon } from './Icons'
+import ThemeToggle from './ThemeToggle'
 
 const PRIMARY = [
   { to: '/categories', label: 'Categories', icon: 'grid' },
@@ -79,6 +80,7 @@ export default function Navbar() {
         </nav>
 
         <div className="nav-tools">
+          <ThemeToggle />
           <div className="currency-switch" role="group" aria-label="Currency">
             {['INR', 'USD'].map((code) => (
               <button
@@ -88,7 +90,8 @@ export default function Navbar() {
                 aria-pressed={currency === code}
                 onClick={() => setCurrency(code)}
               >
-                {code === 'INR' ? '₹ INR' : '$ USD'}
+                <span aria-hidden="true">{code === 'INR' ? '₹' : '$'}</span>
+                <span className="currency-code">{code}</span>
               </button>
             ))}
           </div>

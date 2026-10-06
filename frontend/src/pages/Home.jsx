@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api/client'
-import { BrandMark } from '../components/Brand'
 import { Icon, CategoryIcon } from '../components/Icons'
 import Message from '../components/Message'
 import ProductCard from '../components/ProductCard'
 import Spinner from '../components/Spinner'
 import ToolLogo from '../components/ToolLogo'
+import ToolOrbit from '../components/ToolOrbit'
 import { useAuth } from '../context/AuthContext'
 import { useFavoriteToggle } from '../hooks'
 import { Link, navigate } from '../router'
@@ -27,7 +27,7 @@ export default function Home() {
     Promise.all([
       api.stats(controller.signal),
       api.categories(controller.signal),
-      api.trending(8, controller.signal),
+      api.trending(48, controller.signal),
       api.tools({ freePlan: true, size: 4, sort: 'rating' }, controller.signal),
     ])
       .then(([statsResult, categoryResult, trendingResult, freeResult]) => {
@@ -66,7 +66,7 @@ export default function Home() {
     navigate(`/marketplace${search.trim() ? `?q=${encodeURIComponent(search.trim())}` : ''}`)
   }
 
-  const showcase = trending.slice(0, 8)
+  const showcase = trending.slice(0, 3)
 
   return (
     <>
@@ -78,9 +78,12 @@ export default function Home() {
           <h1 className="hero-title">
             <span className="strong">Every AI Tool</span> <span className="thin">your</span>{' '}
             <span className="thin">work needs,</span> <span className="strong">Matched</span>{' '}
-            <span className="thin">to</span> <span className="strong accent">You</span>
-            <span className="hero-seal" aria-hidden="true">
-              <Icon name="check" size={18} />
+            <span className="thin">to</span>{' '}
+            <span className="nowrap">
+              <span className="strong accent">You</span>
+              <span className="hero-seal" aria-hidden="true">
+                <Icon name="check" size={18} />
+              </span>
             </span>
           </h1>
 
@@ -112,19 +115,7 @@ export default function Home() {
           </form>
         </div>
 
-        <div className="hero-orbit" aria-hidden="true">
-          <span className="orbit-ring" />
-          <span className="orbit-ring orbit-ring-2" />
-          <span className="orbit-core">
-            <BrandMark size={84} />
-          </span>
-          {showcase.map((tool, index) => (
-            <span key={tool.slug} className="orbit-tile" style={{ '--i': index, '--n': showcase.length }}>
-              <ToolLogo tool={tool} size={42} />
-              <span className="orbit-name">{tool.name}</span>
-            </span>
-          ))}
-        </div>
+        <ToolOrbit tools={trending} />
       </section>
 
       <section className="feature-strip" aria-label="Highlights">
@@ -146,7 +137,7 @@ export default function Home() {
         </Link>
         <Link to="/marketplace" className="feature-cell feature-dark">
           <span className="logo-stack">
-            {showcase.slice(0, 3).map((tool) => (
+            {showcase.map((tool) => (
               <ToolLogo key={tool.slug} tool={tool} size={36} />
             ))}
           </span>
@@ -248,7 +239,7 @@ export default function Home() {
           <Spinner label="Loading the marketplace" />
         ) : (
           <div className="product-grid">
-            {trending.map((tool) => (
+            {trending.slice(0, 8).map((tool) => (
               <ProductCard
                 key={tool.slug}
                 tool={tool}
