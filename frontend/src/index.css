@@ -1,33 +1,42 @@
 /* Design tokens and element defaults. Component styles live in App.css. */
 
 :root {
-  --bg: #f7f7fb;
+  --bg: #f6f6fa;
   --surface: #ffffff;
-  --surface-2: #f1f1f8;
-  --border: #e2e2ee;
-  --text: #3d3a4d;
-  --text-strong: #14121f;
-  --text-muted: #6d6a80;
+  --surface-2: #f2f1f8;
+  --surface-3: #e9e7f5;
+  --border: #e3e1ee;
+  --border-strong: #cfcce0;
+  --text: #3f3c50;
+  --text-strong: #13111f;
+  --text-muted: #6c6981;
   --accent: #5b3df5;
-  --accent-strong: #4529d8;
-  --accent-soft: rgba(91, 61, 245, 0.1);
+  --accent-strong: #4428d6;
+  --accent-soft: rgba(91, 61, 245, 0.09);
   --accent-contrast: #ffffff;
+  --teal: #0f9488;
+  --teal-soft: rgba(15, 148, 136, 0.11);
   --success: #12795a;
-  --success-soft: rgba(18, 121, 90, 0.12);
+  --success-soft: rgba(18, 121, 90, 0.11);
+  --warning: #9a5b00;
+  --warning-soft: rgba(217, 132, 0, 0.14);
   --danger: #b3261e;
-  --danger-soft: rgba(179, 38, 30, 0.12);
+  --danger-soft: rgba(179, 38, 30, 0.1);
+  --brand-gradient: linear-gradient(135deg, #5b3df5 0%, #8b5cf6 55%, #14b8a6 100%);
   --shadow-sm: 0 1px 2px rgba(20, 18, 31, 0.06);
-  --shadow-md: 0 12px 30px rgba(20, 18, 31, 0.08);
+  --shadow-md: 0 10px 28px rgba(20, 18, 31, 0.08);
+  --shadow-lg: 0 24px 60px rgba(36, 22, 120, 0.14);
   --radius-sm: 10px;
-  --radius-md: 16px;
-  --radius-lg: 24px;
-  --max-width: 1160px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --max-width: 1240px;
+  --nav-height: 68px;
   --sans: 'Segoe UI', system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
 
-  color-scheme: light dark;
+  color-scheme: light;
   font-family: var(--sans);
   font-size: 16px;
-  line-height: 1.6;
+  line-height: 1.55;
   color: var(--text);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
@@ -35,23 +44,31 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0e0d14;
-    --surface: #17161f;
-    --surface-2: #1f1e2a;
-    --border: #2c2a3a;
+    color-scheme: dark;
+    --bg: #0d0c14;
+    --surface: #16151f;
+    --surface-2: #1d1c29;
+    --surface-3: #262436;
+    --border: #2b2a3b;
+    --border-strong: #3b3950;
     --text: #cfccdd;
     --text-strong: #f6f5fb;
-    --text-muted: #9995ad;
-    --accent: #9b8bff;
-    --accent-strong: #b0a3ff;
-    --accent-soft: rgba(155, 139, 255, 0.16);
-    --accent-contrast: #14121f;
+    --text-muted: #9b97b0;
+    --accent: #9d8cff;
+    --accent-strong: #b4a7ff;
+    --accent-soft: rgba(157, 140, 255, 0.14);
+    --accent-contrast: #12101d;
+    --teal: #4fd1c1;
+    --teal-soft: rgba(79, 209, 193, 0.14);
     --success: #5fd3ac;
     --success-soft: rgba(95, 211, 172, 0.14);
+    --warning: #f5b84a;
+    --warning-soft: rgba(245, 184, 74, 0.14);
     --danger: #ff9b93;
     --danger-soft: rgba(255, 155, 147, 0.14);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-    --shadow-md: 0 16px 36px rgba(0, 0, 0, 0.45);
+    --shadow-md: 0 14px 34px rgba(0, 0, 0, 0.45);
+    --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.55);
   }
 }
 
@@ -78,15 +95,15 @@ h3 {
 }
 
 h1 {
-  font-size: clamp(2rem, 6vw, 3.25rem);
+  font-size: clamp(1.9rem, 5vw, 3rem);
 }
 
 h2 {
-  font-size: clamp(1.5rem, 4vw, 2.1rem);
+  font-size: clamp(1.3rem, 3vw, 1.75rem);
 }
 
 h3 {
-  font-size: 1.125rem;
+  font-size: 1.05rem;
 }
 
 p {

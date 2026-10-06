@@ -1,11 +1,14 @@
 package com.handyai.build.service;
 
 import com.handyai.build.domain.AiTool;
+import com.handyai.build.domain.PriceBook.Currency;
 import com.handyai.build.domain.PricingModel;
+import com.handyai.build.domain.ProfessionCatalog;
 import com.handyai.build.dto.RecommendationRequest;
 import com.handyai.build.dto.RecommendationResponse;
 import com.handyai.build.dto.RecommendationResponse.Recommendation;
 import com.handyai.build.dto.ToolResponse;
+import com.handyai.build.exception.BadRequestException;
 import com.handyai.build.repository.AiToolRepository;
 import com.handyai.build.repository.FavoriteRepository;
 import com.handyai.build.repository.ReviewRepository;
@@ -39,7 +42,10 @@ public class RecommendationService {
             "the", "and", "for", "with", "that", "this", "have", "has", "from", "your", "you",
             "our", "are", "want", "need", "help", "using", "use", "make", "get", "some", "about",
             "into", "more", "best", "good", "able", "work", "working", "would", "like", "can",
-            "will", "any", "all", "what", "when", "how", "tool", "tools", "app", "apps", "ai");
+            "will", "any", "all", "what", "when", "how", "tool", "tools", "app", "apps", "ai",
+            // Budget words are applied as filters, never matched against descriptions.
+            "free", "cheap", "cheaper", "affordable", "paid", "price", "budget", "under", "only",
+            "ones", "month", "monthly", "rupees", "dollars");
 
     /** Profession/intent hints mapped onto category slugs the seeder creates. */
     private static final Map<String, List<String>> INTENT_CATEGORIES = Map.ofEntries(
@@ -113,11 +119,27 @@ public class RecommendationService {
                 : professionOf(currentUserId);
 
         String goal = request.goal() == null ? "" : request.goal();
-        Set<String> keywords = tokenise(goal + " " + (profession == null ? "" : profession));
+        Set<String> goalKeywords = tokenise(goal);
+        Set<String> keywords = new java.util.LinkedHashSet<>(goalKeywords);
+        keywords.addAll(tokenise(profession));
+
+        // What the visitor asked for outranks who they are: categories implied by the task get
+        // the full boost, the profession's categories a smaller one, so "tools for designers"
+        // still leads with design tools for someone whose profile says lawyer.
         Set<String> wantedCategories = new HashSet<>(normalise(request.categorySlugs()));
-        wantedCategories.addAll(intentCategories(keywords));
+        wantedCategories.addAll(intentCategories(goalKeywords));
+        Set<String> professionCategories = new HashSet<>(intentCategories(tokenise(profession)));
+        ProfessionCatalog.find(profession)
+                .ifPresent(entry -> professionCategories.addAll(entry.categories()));
+        professionCategories.removeAll(wantedCategories);
+        String professionLabel = ProfessionCatalog.find(profession).map(ProfessionCatalog.Entry::name)
+                .orElse(profession);
 
         PricingModel pricing = parsePricing(request.pricing());
+        boolean freePlanOnly = Boolean.TRUE.equals(request.freePlanOnly());
+        Currency currency = parseCurrency(request.currency());
+        Double maxMonthly = request.maxMonthlyPrice();
+        Set<String> excluded = new HashSet<>(normalise(request.excludeSlugs()));
         Set<Long> favoriteToolIds = currentUserId == null
                 ? Set.of()
                 : new HashSet<>(favoriteRepository.findToolIdsByUser(currentUserId));
@@ -126,23 +148,47 @@ public class RecommendationService {
         List<AiTool> catalogue = toolRepository.findAllByOrderByPopularityDesc(
                 org.springframework.data.domain.PageRequest.of(0, 500));
 
-        List<Recommendation> ranked = catalogue.stream()
-                // A stated budget is a filter, not a preference: it means the same thing here as
-                // it does on the catalogue's pricing filter.
+        // A task none of whose words appear anywhere in the catalogue was not understood. Saying
+        // so beats answering "asdkjh" with whatever suits the visitor's profession.
+        boolean goalUnderstood = goalKeywords.isEmpty()
+                || !intentCategories(goalKeywords).isEmpty()
+                || !normalise(request.categorySlugs()).isEmpty()
+                || catalogue.stream().anyMatch(tool -> mentionsAny(tool, goalKeywords));
+        if (!goalUnderstood) {
+            return new RecommendationResponse(noMatchSummary(goal, null, false), List.of());
+        }
+
+        // A stated budget is a filter, not a preference: it means the same thing here as it does
+        // on the marketplace's filters.
+        catalogue = catalogue.stream()
                 .filter(tool -> pricing == null || tool.getPricingModel() == pricing)
-                .map(tool -> score(tool, keywords, wantedCategories, pricing, favoriteToolIds,
-                        affinityCategoryIds))
+                .filter(tool -> !freePlanOnly || tool.hasFreePlan())
+                .filter(tool -> maxMonthly == null || withinBudget(tool, maxMonthly, currency))
+                .filter(tool -> !excluded.contains(tool.getSlug()))
+                .toList();
+
+        List<Recommendation> ranked = catalogue.stream()
+                .map(tool -> score(tool, keywords, wantedCategories, professionCategories,
+                        professionLabel, pricing, favoriteToolIds, affinityCategoryIds))
                 .filter(scored -> scored.matchScore() > 0)
                 .sorted(Comparator.comparingInt(Recommendation::matchScore).reversed()
                         .thenComparing(item -> item.tool().name()))
                 .limit(limit)
                 .toList();
 
+        boolean describedSomething = !keywords.isEmpty() || !wantedCategories.isEmpty()
+                || !professionCategories.isEmpty();
+        if (ranked.isEmpty() && describedSomething) {
+            // The visitor asked for something specific and nothing fits: say so honestly instead
+            // of padding the list with unrelated tools.
+            boolean budgetFiltered = pricing != null || freePlanOnly || maxMonthly != null;
+            return new RecommendationResponse(noMatchSummary(goal, pricing, budgetFiltered),
+                    List.of());
+        }
+
         if (ranked.isEmpty()) {
-            // Nothing matched the wording: fall back to the strongest all-round picks rather than
-            // sending the visitor away empty handed.
+            // An empty request: offer the strongest all-round picks as a starting point.
             ranked = catalogue.stream()
-                    .filter(tool -> pricing == null || tool.getPricingModel() == pricing)
                     .limit(limit)
                     .map(tool -> new Recommendation(
                             ToolResponse.from(tool, favoriteToolIds.contains(tool.getId())),
@@ -155,6 +201,7 @@ public class RecommendationService {
     }
 
     private Recommendation score(AiTool tool, Set<String> keywords, Set<String> wantedCategories,
+                                 Set<String> professionCategories, String professionLabel,
                                  PricingModel pricing, Set<Long> favoriteToolIds,
                                  Set<Long> affinityCategoryIds) {
         int score = 0;
@@ -204,6 +251,16 @@ public class RecommendationService {
         if (wantedCategories.contains(tool.getCategory().getSlug())) {
             score += 22;
             reasons.add("Top pick in " + tool.getCategory().getName());
+        } else if (professionCategories.contains(tool.getCategory().getSlug())) {
+            score += 12;
+            reasons.add("Suits your work as a " + professionLabel.toLowerCase(Locale.ROOT));
+        }
+
+        // Everything below only boosts a tool that already fits what was asked for. The budget is
+        // applied as a filter, so on its own it must never make an unrelated tool a "match".
+        if (score == 0) {
+            return new Recommendation(
+                    ToolResponse.from(tool, favoriteToolIds.contains(tool.getId())), 0, List.of());
         }
 
         if (pricing != null && tool.getPricingModel() == pricing) {
@@ -221,19 +278,17 @@ public class RecommendationService {
             reasons.add("Rated " + tool.averageRating() + " by the community");
         }
 
-        if (score > 0) {
-            score += tool.getPopularity() / 10;
-            if (tool.isFeatured()) {
-                score += 3;
-            }
-            // A small nudge towards free tools, but only among those that already matched: it
-            // must never be the only thing keeping a tool in the list.
-            if (pricing == null && tool.getPricingModel() == PricingModel.FREE) {
-                score += 4;
-            }
+        score += tool.getPopularity() / 10;
+        if (tool.isFeatured()) {
+            score += 3;
+        }
+        // A small nudge towards free tools, but only among those that already matched: it must
+        // never be the only thing keeping a tool in the list.
+        if (pricing == null && tool.getPricingModel() == PricingModel.FREE) {
+            score += 4;
         }
 
-        if (reasons.isEmpty() && score > 0) {
+        if (reasons.isEmpty()) {
             reasons.add("A strong general-purpose option");
         }
 
@@ -275,6 +330,11 @@ public class RecommendationService {
                 .map(String::trim)
                 .filter(word -> word.length() > 2)
                 .filter(word -> !STOP_WORDS.contains(word))
+                // "designers" should match a "designer" intent and a "design" tag, so plurals
+                // also contribute their singular form.
+                .flatMap(word -> word.length() > 4 && word.endsWith("s") && !word.endsWith("ss")
+                        ? java.util.stream.Stream.of(word, word.substring(0, word.length() - 1))
+                        : java.util.stream.Stream.of(word))
                 .limit(40)
                 .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
     }
@@ -296,8 +356,57 @@ public class RecommendationService {
         try {
             return PricingModel.valueOf(pricing.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException ex) {
-            return null;
+            throw new BadRequestException("Unknown pricing filter: " + pricing);
         }
+    }
+
+    private String noMatchSummary(String goal, PricingModel pricing, boolean budgetFiltered) {
+        StringBuilder summary = new StringBuilder("Nothing in the catalogue fits ");
+        summary.append(goal.isBlank() ? "that" : "\"" + goal.trim() + "\"");
+        if (pricing != null) {
+            summary.append(" at the ").append(pricingFilterLabel(pricing)).append(" price");
+        } else if (budgetFiltered) {
+            summary.append(" within that budget");
+        }
+        summary.append(" yet. Try describing the task in other words");
+        if (budgetFiltered) {
+            summary.append(" or widen the price filter");
+        }
+        return summary.append('.').toString();
+    }
+
+    /**
+     * The budget applies to the paid plan, as on the marketplace's price filter: a free tier does
+     * not make a tool whose paid plan costs more "fit" the budget. A tool with no known price is
+     * left out rather than guessed at.
+     */
+    private boolean withinBudget(AiTool tool, double maxMonthly, Currency currency) {
+        Number price = currency == Currency.INR ? tool.getPriceMonthlyInr() : tool.getPriceMonthlyUsd();
+        return price != null && price.doubleValue() <= maxMonthly;
+    }
+
+    /** Whether any of the words appear anywhere in what the catalogue says about the tool. */
+    private boolean mentionsAny(AiTool tool, Set<String> words) {
+        String text = (tool.getName() + " " + tool.getTagline() + " " + tool.getDescription() + " "
+                + (tool.getTags() == null ? "" : tool.getTags())).toLowerCase(Locale.ROOT);
+        return words.stream().anyMatch(text::contains);
+    }
+
+    private Currency parseCurrency(String currency) {
+        try {
+            return Currency.parse(currency);
+        } catch (IllegalArgumentException ex) {
+            throw new BadRequestException("Currency must be INR or USD");
+        }
+    }
+
+    private String pricingFilterLabel(PricingModel pricing) {
+        return switch (pricing) {
+            case FREE -> "free";
+            case FREEMIUM -> "free tier";
+            case TRIAL -> "free trial";
+            case PAID -> "paid";
+        };
     }
 
     private String pricingLabel(PricingModel pricing) {

@@ -47,14 +47,29 @@ export function AuthProvider({ children }) {
     return result.user
   }, [])
 
+  const updateProfile = useCallback(async (payload) => {
+    const updated = await api.updateProfile(payload)
+    setUser(updated)
+    return updated
+  }, [])
+
   const logout = useCallback(() => {
     setToken(null)
     setUser(null)
   }, [])
 
   const value = useMemo(
-    () => ({ user, loading, login, register, logout, isAuthenticated: Boolean(user) }),
-    [user, loading, login, register, logout],
+    () => ({
+      user,
+      loading,
+      login,
+      register,
+      updateProfile,
+      logout,
+      isAuthenticated: Boolean(user),
+      isAdmin: user?.role === 'ADMIN',
+    }),
+    [user, loading, login, register, updateProfile, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

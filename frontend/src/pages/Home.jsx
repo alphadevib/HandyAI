@@ -1,221 +1,117 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ApiError, api } from '../api/client'
+import { useCallback, useEffect, useState } from 'react'
+import { api } from '../api/client'
+import { Icon, CategoryIcon } from '../components/Icons'
 import Message from '../components/Message'
+import ProductCard from '../components/ProductCard'
 import Spinner from '../components/Spinner'
-import ToolCard from '../components/ToolCard'
+import ToolLogo from '../components/ToolLogo'
 import { useAuth } from '../context/AuthContext'
-import { navigate } from '../router'
+import { useFavoriteToggle } from '../hooks'
+import { Link, navigate } from '../router'
 
-const PRICING_FILTERS = [
-  { value: 'ALL', label: 'Any price' },
-  { value: 'FREE', label: 'Free' },
-  { value: 'FREEMIUM', label: 'Free tier' },
-  { value: 'TRIAL', label: 'Free trial' },
-  { value: 'PAID', label: 'Paid' },
-]
-
-const SORT_OPTIONS = [
-  { value: 'popular', label: 'Most used' },
-  { value: 'rating', label: 'Best rated' },
-  { value: 'name', label: 'A to Z' },
-  { value: 'newest', label: 'Newest' },
-]
-
-const PAGE_SIZE = 9
-
+/** The storefront: search, personalised picks, categories and what is popular right now. */
 export default function Home() {
-  const { isAuthenticated, user } = useAuth()
-
+  const { user, isAuthenticated } = useAuth()
   const [stats, setStats] = useState(null)
   const [categories, setCategories] = useState([])
-
-  const [query, setQuery] = useState('')
-  const [activeCategory, setActiveCategory] = useState('')
-  const [pricing, setPricing] = useState('ALL')
-  const [sort, setSort] = useState('popular')
-
-  const [tools, setTools] = useState([])
-  const [pageInfo, setPageInfo] = useState({ page: 0, totalElements: 0, last: true })
-  const [loadingTools, setLoadingTools] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [toolsError, setToolsError] = useState('')
-
-  const [goal, setGoal] = useState('')
-  const [profession, setProfession] = useState('')
-  const [matchPricing, setMatchPricing] = useState('ALL')
-  const [matching, setMatching] = useState(false)
-  const [matchError, setMatchError] = useState('')
-  const [matchResult, setMatchResult] = useState(null)
-
-  const [favoriteBusy, setFavoriteBusy] = useState(null)
-  const [notice, setNotice] = useState('')
-
-  const discoverRef = useRef(null)
+  const [trending, setTrending] = useState([])
+  const [freeTools, setFreeTools] = useState([])
+  const [forYou, setForYou] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     const controller = new AbortController()
-    Promise.all([api.stats(controller.signal), api.categories(controller.signal)])
-      .then(([statsResult, categoryResult]) => {
+    Promise.all([
+      api.stats(controller.signal),
+      api.categories(controller.signal),
+      api.trending(8, controller.signal),
+      api.tools({ freePlan: true, size: 4, sort: 'rating' }, controller.signal),
+    ])
+      .then(([statsResult, categoryResult, trendingResult, freeResult]) => {
         setStats(statsResult)
         setCategories(categoryResult)
+        setTrending(trendingResult)
+        setFreeTools(freeResult.content)
       })
-      .catch(() => {
-        /* the page still works without the counters */
+      .catch((loadError) => {
+        if (loadError.name !== 'AbortError') setError(loadError.message)
       })
+      .finally(() => setLoading(false))
     return () => controller.abort()
-  }, [])
+  }, [isAuthenticated])
 
-  // Prefill the role box from the signed-in profile, without fighting the user once they type.
-  const [seededProfession, setSeededProfession] = useState(null)
-  if (user?.profession && seededProfession !== user.profession) {
-    setSeededProfession(user.profession)
-    if (!profession) setProfession(user.profession)
-  }
-
-  // Debounced so typing in the search box does not fire a request per keystroke.
+  const profession = user?.profession
   useEffect(() => {
+    if (!profession) return undefined
     const controller = new AbortController()
-    const timer = setTimeout(() => {
-      setLoadingTools(true)
-      setToolsError('')
-      api
-        .tools(
-          { q: query, category: activeCategory, pricing, sort, page: 0, size: PAGE_SIZE },
-          controller.signal,
-        )
-        .then((result) => {
-          setTools(result.content)
-          setPageInfo({
-            page: result.page,
-            totalElements: result.totalElements,
-            last: result.last,
-          })
-        })
-        .catch((error) => {
-          if (error.name === 'AbortError') return
-          setToolsError(error.message)
-        })
-        .finally(() => setLoadingTools(false))
-    }, query ? 300 : 0)
-
-    return () => {
-      controller.abort()
-      clearTimeout(timer)
-    }
-  }, [query, activeCategory, pricing, sort, isAuthenticated])
-
-  const loadMore = useCallback(() => {
-    setLoadingMore(true)
     api
-      .tools({
-        q: query,
-        category: activeCategory,
-        pricing,
-        sort,
-        page: pageInfo.page + 1,
-        size: PAGE_SIZE,
-      })
-      .then((result) => {
-        setTools((current) => [...current, ...result.content])
-        setPageInfo({ page: result.page, totalElements: result.totalElements, last: result.last })
-      })
-      .catch((error) => setToolsError(error.message))
-      .finally(() => setLoadingMore(false))
-  }, [query, activeCategory, pricing, sort, pageInfo.page])
+      .recommend({ profession, limit: 8 }, controller.signal)
+      .then((result) => setForYou(result.recommendations))
+      .catch(() => setForYou([]))
+    return () => controller.abort()
+  }, [profession])
 
-  const submitMatch = useCallback(
-    async (event) => {
-      event.preventDefault()
-      setMatching(true)
-      setMatchError('')
-      try {
-        const result = await api.recommend({
-          goal,
-          profession,
-          pricing: matchPricing,
-          categorySlugs: activeCategory ? [activeCategory] : [],
-          limit: 6,
-        })
-        setMatchResult(result)
-      } catch (error) {
-        setMatchError(error.message)
-      } finally {
-        setMatching(false)
-      }
-    },
-    [goal, profession, matchPricing, activeCategory],
-  )
+  const applyEverywhere = useCallback((update) => {
+    setTrending((items) => items.map(update))
+    setFreeTools((items) => items.map(update))
+    setForYou((items) => items?.map((entry) => ({ ...entry, tool: update(entry.tool) })))
+  }, [])
+  const favorites = useFavoriteToggle(applyEverywhere)
 
-  const toggleFavorite = useCallback(
-    async (tool) => {
-      if (!isAuthenticated) {
-        setNotice('Create a free account to keep a list of the tools you like.')
-        navigate('/login')
-        return
-      }
-      setFavoriteBusy(tool.slug)
-      try {
-        const result = await api.toggleFavorite(tool.slug)
-        const apply = (item) =>
-          item.slug === tool.slug ? { ...item, favorite: result.favorite } : item
-        setTools((current) => current.map(apply))
-        setMatchResult((current) =>
-          current
-            ? {
-                ...current,
-                recommendations: current.recommendations.map((entry) => ({
-                  ...entry,
-                  tool: apply(entry.tool),
-                })),
-              }
-            : current,
-        )
-      } catch (error) {
-        setNotice(
-          error instanceof ApiError && error.status === 401
-            ? 'Your session expired. Please sign in again.'
-            : error.message,
-        )
-      } finally {
-        setFavoriteBusy(null)
-      }
-    },
-    [isAuthenticated],
-  )
-
-  const resultCount = useMemo(() => pageInfo.totalElements ?? 0, [pageInfo.totalElements])
-
-  const focusDiscover = (slug) => {
-    setActiveCategory((current) => (current === slug ? '' : slug))
-    discoverRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const submitSearch = (event) => {
+    event.preventDefault()
+    navigate(`/marketplace${search.trim() ? `?q=${encodeURIComponent(search.trim())}` : ''}`)
   }
+
+  const showcase = trending.slice(0, 8)
 
   return (
     <>
       <section className="hero">
         <div className="hero-copy">
-          <p className="eyebrow">AI tool discovery</p>
+          <p className="eyebrow">
+            <Icon name="spark" size={16} /> The AI tools marketplace
+          </p>
           <h1>
-            The right AI tool for the job,
-            <span className="accent"> without the endless list</span>
+            Every AI tool your work needs, <span className="accent">matched to what you do.</span>
           </h1>
           <p className="lede">
-            Most people use two or three AI tools and never hear about the one that would have
-            saved them an afternoon. Describe what you are trying to do and HandyAI suggests
-            platforms that fit, with the reason it picked each one.
+            Compare {stats?.toolCount ?? 'dozens of'} AI platforms by price, see monthly, quarterly
+            and annual plans side by side, and keep every subscription in one place.
           </p>
+
+          <form className="hero-search" onSubmit={submitSearch} role="search">
+            <Icon name="search" size={20} />
+            <label htmlFor="hero-search" className="sr-only">
+              Search the marketplace
+            </label>
+            <input
+              id="hero-search"
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search tools: video editing, logo, meeting notes…"
+            />
+            <button type="submit" className="btn btn-primary">
+              Search
+            </button>
+          </form>
+
           <div className="hero-actions">
-            <a className="btn btn-primary btn-lg" href="#match">
-              Find my tools
-            </a>
-            <a className="btn btn-secondary btn-lg" href="#discover">
-              Browse the catalogue
-            </a>
+            <Link to="/chat" className="btn btn-secondary">
+              <Icon name="mic" size={18} /> Ask HandyAI by voice or chat
+            </Link>
+            <Link to="/marketplace?freePlan=true" className="btn btn-ghost">
+              Browse free tools
+            </Link>
           </div>
+
           {stats && (
             <dl className="hero-stats">
               <div>
-                <dt>Tools</dt>
+                <dt>AI tools</dt>
                 <dd>{stats.toolCount}</dd>
               </div>
               <div>
@@ -230,223 +126,152 @@ export default function Home() {
           )}
         </div>
 
-        <aside className="hero-panel" aria-label="Example suggestions">
-          <p className="panel-title">People are looking for</p>
-          <ul className="panel-list">
-            {[
-              'summarise my meetings automatically',
-              'make product photos without a studio',
-              'review my code before my teammate does',
-              'read 40 research papers this week',
-            ].map((example) => (
-              <li key={example}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setGoal(example)
-                    document.getElementById('match')?.scrollIntoView({ behavior: 'smooth' })
-                  }}
-                >
-                  {example}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </aside>
-      </section>
-
-      <Message tone="info">{notice}</Message>
-
-      <section id="match" className="section matcher">
-        <header className="section-head">
-          <h2>Tell us the job, not the tool</h2>
-          <p>
-            One or two sentences is enough. Signing in lets HandyAI learn from what you save and
-            rate.
-          </p>
-        </header>
-
-        <form className="match-form" onSubmit={submitMatch}>
-          <label className="field">
-            <span>What are you trying to get done?</span>
-            <textarea
-              value={goal}
-              onChange={(event) => setGoal(event.target.value)}
-              rows={3}
-              maxLength={400}
-              placeholder="e.g. turn long client calls into a summary and a follow-up email"
-              required
-            />
-          </label>
-
-          <div className="field-row">
-            <label className="field">
-              <span>Your role (optional)</span>
-              <input
-                type="text"
-                value={profession}
-                onChange={(event) => setProfession(event.target.value)}
-                maxLength={120}
-                placeholder="Marketer, student, developer…"
-              />
-            </label>
-            <label className="field">
-              <span>Budget</span>
-              <select
-                value={matchPricing}
-                onChange={(event) => setMatchPricing(event.target.value)}
-              >
-                {PRICING_FILTERS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <button type="submit" className="btn btn-primary btn-lg" disabled={matching}>
-            {matching ? 'Matching…' : 'Show my matches'}
-          </button>
-        </form>
-
-        <Message>{matchError}</Message>
-
-        {matchResult && (
-          <div className="match-results">
-            <p className="match-summary">{matchResult.summary}</p>
-            <div className="tool-grid">
-              {matchResult.recommendations.map((entry) => (
-                <ToolCard
-                  key={entry.tool.id}
-                  tool={entry.tool}
-                  reasons={entry.reasons}
-                  matchScore={entry.matchScore}
-                  busy={favoriteBusy === entry.tool.slug}
-                  onToggleFavorite={toggleFavorite}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-      </section>
-
-      <section id="categories" className="section">
-        <header className="section-head">
-          <h2>Browse by what you do</h2>
-          <p>Thirteen corners of the AI landscape, each with tools worth knowing about.</p>
-        </header>
-
-        <div className="category-grid">
-          {categories.map((category) => (
-            <button
-              type="button"
-              key={category.slug}
-              className={`category-card ${activeCategory === category.slug ? 'is-active' : ''}`}
-              onClick={() => focusDiscover(category.slug)}
-            >
-              <span className="category-icon" aria-hidden="true">
-                {category.icon}
-              </span>
-              <span className="category-name">{category.name}</span>
-              <span className="category-count">{category.toolCount} tools</span>
-              <span className="category-description">{category.description}</span>
-            </button>
+        <div className="hero-wall" aria-hidden="true">
+          {showcase.map((tool, index) => (
+            <span key={tool.slug} className="wall-tile" style={{ '--i': index }}>
+              <ToolLogo tool={tool} size={44} />
+              <span>{tool.name}</span>
+            </span>
           ))}
         </div>
       </section>
 
-      <section id="discover" className="section" ref={discoverRef}>
-        <header className="section-head">
-          <h2>The catalogue</h2>
-          <p>
-            {resultCount} {resultCount === 1 ? 'tool' : 'tools'} match your filters.
-          </p>
-        </header>
+      <Message>{error || favorites.error}</Message>
 
-        <div className="filters">
-          <label className="field search-field">
-            <span className="sr-only">Search tools</span>
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search by name, task or tag…"
-            />
-          </label>
-
-          <label className="field">
-            <span className="sr-only">Category</span>
-            <select
-              value={activeCategory}
-              onChange={(event) => setActiveCategory(event.target.value)}
-            >
-              <option value="">All categories</option>
-              {categories.map((category) => (
-                <option key={category.slug} value={category.slug}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="field">
-            <span className="sr-only">Pricing</span>
-            <select value={pricing} onChange={(event) => setPricing(event.target.value)}>
-              {PRICING_FILTERS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="field">
-            <span className="sr-only">Sort</span>
-            <select value={sort} onChange={(event) => setSort(event.target.value)}>
-              {SORT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <Message>{toolsError}</Message>
-
-        {loadingTools ? (
-          <Spinner label="Loading tools" />
-        ) : tools.length === 0 ? (
-          <p className="empty">
-            Nothing matches that yet. Try a broader word, or clear the filters.
-          </p>
-        ) : (
-          <>
-            <div className="tool-grid">
-              {tools.map((tool) => (
-                <ToolCard
-                  key={tool.id}
-                  tool={tool}
-                  busy={favoriteBusy === tool.slug}
-                  onToggleFavorite={toggleFavorite}
+      {isAuthenticated && profession ? (
+        <section className="section">
+          <header className="section-head row">
+            <div>
+              <p className="eyebrow">Picked for you</p>
+              <h2>Top tools for a {profession.toLowerCase()}</h2>
+            </div>
+            <Link to="/profile" className="text-link">
+              Change profession
+            </Link>
+          </header>
+          {forYou === null ? (
+            <Spinner label="Finding your matches" />
+          ) : (
+            <div className="product-grid">
+              {forYou.map((entry) => (
+                <ProductCard
+                  key={entry.tool.slug}
+                  tool={entry.tool}
+                  reasons={entry.reasons}
+                  busy={favorites.busySlug === entry.tool.slug}
+                  onToggleFavorite={favorites.toggle}
                 />
               ))}
             </div>
-            {!pageInfo.last && (
-              <div className="load-more">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={loadMore}
-                  disabled={loadingMore}
-                >
-                  {loadingMore ? 'Loading…' : 'Show more tools'}
-                </button>
-              </div>
-            )}
-          </>
+          )}
+        </section>
+      ) : (
+        <section className="promo-band">
+          <div>
+            <h2>Get picks made for your profession</h2>
+            <p>
+              Tell us what you do, from software developer to chartered accountant, and the
+              marketplace puts the tools that fit your work first.
+            </p>
+          </div>
+          <div className="promo-actions">
+            <Link to="/signup" className="btn btn-primary">
+              Create a free profile
+            </Link>
+            <Link to="/chat" className="btn btn-ghost">
+              Or just ask the chat
+            </Link>
+          </div>
+        </section>
+      )}
+
+      <section className="section">
+        <header className="section-head row">
+          <div>
+            <p className="eyebrow">Shop by category</p>
+            <h2>What do you need help with?</h2>
+          </div>
+          <Link to="/categories" className="text-link">
+            All categories
+          </Link>
+        </header>
+        <div className="category-strip">
+          {categories.map((category) => (
+            <Link
+              key={category.slug}
+              to={`/marketplace?category=${category.slug}`}
+              className="category-chip"
+            >
+              <span className={`category-badge cat-${category.slug}`}>
+                <CategoryIcon slug={category.slug} size={20} />
+              </span>
+              {category.name}
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="section">
+        <header className="section-head row">
+          <div>
+            <p className="eyebrow">Trending</p>
+            <h2>Most popular in the marketplace</h2>
+          </div>
+          <Link to="/marketplace" className="text-link">
+            See all tools
+          </Link>
+        </header>
+        {loading ? (
+          <Spinner label="Loading the marketplace" />
+        ) : (
+          <div className="product-grid">
+            {trending.map((tool) => (
+              <ProductCard
+                key={tool.slug}
+                tool={tool}
+                busy={favorites.busySlug === tool.slug}
+                onToggleFavorite={favorites.toggle}
+              />
+            ))}
+          </div>
         )}
+      </section>
+
+      {freeTools.length > 0 && (
+        <section className="section">
+          <header className="section-head row">
+            <div>
+              <p className="eyebrow">Free to start</p>
+              <h2>Best rated with a free plan</h2>
+            </div>
+            <Link to="/marketplace?freePlan=true" className="text-link">
+              All free tools
+            </Link>
+          </header>
+          <div className="product-grid">
+            {freeTools.map((tool) => (
+              <ProductCard
+                key={tool.slug}
+                tool={tool}
+                busy={favorites.busySlug === tool.slug}
+                onToggleFavorite={favorites.toggle}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className="chat-band">
+        <span className="chat-band-icon">
+          <Icon name="mic" size={28} />
+        </span>
+        <div>
+          <h2>Not sure what to search for?</h2>
+          <p>Tell HandyAI what you are trying to do, out loud or in a sentence, and it picks the tools.</p>
+        </div>
+        <Link to="/chat" className="btn btn-primary">
+          Open AI Chat
+        </Link>
       </section>
     </>
   )

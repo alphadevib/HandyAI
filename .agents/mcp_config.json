@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "agy": {
+      "command": "node",
+      "args": [
+        "C:\\HandyAI\\agy_mcp\\dist\\index.js"
+      ],
+      "cwd": "C:\\HandyAI"
+    }
+  }
+}

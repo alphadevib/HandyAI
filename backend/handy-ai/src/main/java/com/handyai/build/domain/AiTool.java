@@ -55,6 +55,23 @@ public class AiTool {
     @Column(name = "price_note", length = 120)
     private String priceNote;
 
+    /**
+     * Entry-level paid plan, billed monthly and billed yearly. Zero means the tool has no paid plan
+     * at all; {@code null} means the price is not known yet. The rupee columns are stored rather
+     * than converted per request so the marketplace's price filters compare exact numbers.
+     */
+    @Column(name = "price_monthly_usd")
+    private Double priceMonthlyUsd;
+
+    @Column(name = "price_annual_usd")
+    private Double priceAnnualUsd;
+
+    @Column(name = "price_monthly_inr")
+    private Long priceMonthlyInr;
+
+    @Column(name = "price_annual_inr")
+    private Long priceAnnualInr;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
@@ -87,6 +104,11 @@ public class AiTool {
                 .map(String::trim)
                 .filter(tag -> !tag.isEmpty())
                 .toList();
+    }
+
+    /** A FREE or FREEMIUM tool can be used without paying anything. */
+    public boolean hasFreePlan() {
+        return pricingModel == PricingModel.FREE || pricingModel == PricingModel.FREEMIUM;
     }
 
     public double averageRating() {
@@ -158,6 +180,38 @@ public class AiTool {
 
     public void setPriceNote(String priceNote) {
         this.priceNote = priceNote;
+    }
+
+    public Double getPriceMonthlyUsd() {
+        return priceMonthlyUsd;
+    }
+
+    public void setPriceMonthlyUsd(Double priceMonthlyUsd) {
+        this.priceMonthlyUsd = priceMonthlyUsd;
+    }
+
+    public Double getPriceAnnualUsd() {
+        return priceAnnualUsd;
+    }
+
+    public void setPriceAnnualUsd(Double priceAnnualUsd) {
+        this.priceAnnualUsd = priceAnnualUsd;
+    }
+
+    public Long getPriceMonthlyInr() {
+        return priceMonthlyInr;
+    }
+
+    public void setPriceMonthlyInr(Long priceMonthlyInr) {
+        this.priceMonthlyInr = priceMonthlyInr;
+    }
+
+    public Long getPriceAnnualInr() {
+        return priceAnnualInr;
+    }
+
+    public void setPriceAnnualInr(Long priceAnnualInr) {
+        this.priceAnnualInr = priceAnnualInr;
     }
 
     public Category getCategory() {

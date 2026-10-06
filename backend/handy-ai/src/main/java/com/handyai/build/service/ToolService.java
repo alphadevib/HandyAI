@@ -1,6 +1,7 @@
 package com.handyai.build.service;
 
 import com.handyai.build.domain.AiTool;
+import com.handyai.build.domain.PriceBook.Currency;
 import com.handyai.build.domain.PricingModel;
 import com.handyai.build.dto.PageResponse;
 import com.handyai.build.dto.StatsResponse;
@@ -44,11 +45,29 @@ public class ToolService {
         this.userRepository = userRepository;
     }
 
+    /** Browsing without the marketplace's price filters. */
     @Transactional(readOnly = true)
     public PageResponse<ToolResponse> search(String query, String categorySlug, String pricing,
                                              String sort, int page, int size, Long currentUserId) {
+        return search(query, categorySlug, pricing, false, null, null, null, null, sort, page,
+                size, currentUserId);
+    }
+
+    /**
+     * The marketplace query. {@code priceMin}/{@code priceMax} bound the monthly price of a tool's
+     * entry paid plan, in {@code currency} (rupees unless USD is asked for), both ends inclusive.
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<ToolResponse> search(String query, String categorySlug, String pricing,
+                                             boolean freePlanOnly, Double priceMin,
+                                             Double priceMax, String currency, String cycle,
+                                             String sort, int page, int size, Long currentUserId) {
+        Currency priceCurrency = parseCurrency(currency);
+        if (priceMin != null && priceMax != null && priceMin > priceMax) {
+            throw new BadRequestException("The minimum price is above the maximum price");
+        }
         Pageable pageable = PageRequest.of(Math.max(page, 0),
-                clamp(size, 1, MAX_PAGE_SIZE), sortFor(sort));
+                clamp(size, 1, MAX_PAGE_SIZE), sortFor(sort, priceCurrency, cycle));
 
         String likeQuery = (query == null || query.isBlank())
                 ? null
@@ -59,7 +78,13 @@ public class ToolService {
             throw ResourceNotFoundException.of("Category", categorySlug);
         }
 
+        boolean inr = priceCurrency == Currency.INR;
         Page<AiTool> result = toolRepository.search(likeQuery, category, parsePricing(pricing),
+                freePlanOnly,
+                inr && priceMin != null ? (long) Math.ceil(priceMin) : null,
+                inr && priceMax != null ? (long) Math.floor(priceMax) : null,
+                inr ? null : priceMin,
+                inr ? null : priceMax,
                 pageable);
         Set<Long> favorites = favoriteIds(currentUserId);
         return PageResponse.of(result, result.getContent().stream()
@@ -131,9 +156,70 @@ public class ToolService {
         return Math.max(min, Math.min(max, value));
     }
 
-    private Sort sortFor(String sort) {
+    /**
+     * The marketplace's price filter options for one currency: who has a free plan, then monthly
+     * price bands that stop at the band holding the most expensive tool.
+     */
+    @Transactional(readOnly = true)
+    public PriceRanges priceRanges(String currency) {
+        Currency priceCurrency = parseCurrency(currency);
+        boolean inr = priceCurrency == Currency.INR;
+        List<AiTool> tools = toolRepository.findAll();
+        List<Double> prices = tools.stream()
+                .map(tool -> inr
+                        ? (tool.getPriceMonthlyInr() == null ? null : tool.getPriceMonthlyInr().doubleValue())
+                        : tool.getPriceMonthlyUsd())
+                .filter(price -> price != null && price > 0)
+                .toList();
+        double highest = prices.stream().mapToDouble(Double::doubleValue).max().orElse(0);
+
+        double[] bounds = inr
+                ? new double[] {1000, 2000, 3000, 5000, 10000, 20000, 50000, 100000}
+                : new double[] {10, 20, 30, 50, 100, 200, 500, 1000};
+        double step = inr ? 1 : 0.01;
+        List<PriceRange> ranges = new java.util.ArrayList<>();
+        double lower = step;
+        for (double upper : bounds) {
+            double min = lower;
+            long count = prices.stream().filter(price -> price >= min && price <= upper).count();
+            ranges.add(new PriceRange(min, upper, count));
+            if (upper >= highest) {
+                break;
+            }
+            lower = upper + step;
+        }
+        long freePlanCount = tools.stream().filter(AiTool::hasFreePlan).count();
+        return new PriceRanges(priceCurrency.name(), freePlanCount, highest, ranges);
+    }
+
+    public record PriceRange(double min, double max, long count) {
+    }
+
+    public record PriceRanges(String currency, long freePlanCount, double highestMonthly,
+                              List<PriceRange> ranges) {
+    }
+
+    private Currency parseCurrency(String currency) {
+        try {
+            return Currency.parse(currency);
+        } catch (IllegalArgumentException ex) {
+            throw new BadRequestException("Currency must be INR or USD");
+        }
+    }
+
+    /**
+     * Price sorting follows the billing cycle the visitor is looking at: annual discounts differ
+     * between vendors, so the cheapest per month is not always the cheapest per year. Quarterly
+     * is three months at the monthly price, so it sorts like monthly.
+     */
+    private Sort sortFor(String sort, Currency currency, String cycle) {
         String key = sort == null ? "popular" : sort.trim().toLowerCase(Locale.ROOT);
+        boolean annual = "ANNUAL".equalsIgnoreCase(cycle);
+        String priceColumn = "price" + (annual ? "Annual" : "Monthly")
+                + (currency == Currency.INR ? "Inr" : "Usd");
         return switch (key) {
+            case "price_asc" -> Sort.by(Sort.Direction.ASC, priceColumn).and(Sort.by("name"));
+            case "price_desc" -> Sort.by(Sort.Direction.DESC, priceColumn).and(Sort.by("name"));
             case "name" -> Sort.by(Sort.Direction.ASC, "name");
             case "newest" -> Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by("id").descending());
             case "rating" -> Sort.by(Sort.Direction.DESC, "ratingSum", "popularity");

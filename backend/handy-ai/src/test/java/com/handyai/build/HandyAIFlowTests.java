@@ -9,6 +9,7 @@ import com.handyai.build.dto.RecommendationRequest;
 import com.handyai.build.dto.RecommendationResponse;
 import com.handyai.build.dto.RegisterRequest;
 import com.handyai.build.dto.ReviewRequest;
+import com.handyai.build.exception.BadRequestException;
 import com.handyai.build.exception.ConflictException;
 import com.handyai.build.exception.UnauthorizedException;
 import com.handyai.build.security.JwtService;
@@ -130,6 +131,34 @@ class HandyAIFlowTests {
         assertThat(response.recommendations())
                 .extracting(entry -> entry.tool().name())
                 .contains("Claude");
+    }
+
+    @Test
+    void aBudgetNeverPadsTheListWithUnrelatedTools() {
+        RecommendationResponse freeLogo = recommendationService.recommend(
+                new RecommendationRequest("design a logo", null, List.of(), "FREE", 3), null);
+
+        assertThat(freeLogo.recommendations())
+                .allSatisfy(entry -> assertThat(entry.tool().categorySlug()).isIn("design", "image"));
+        if (freeLogo.recommendations().isEmpty()) {
+            assertThat(freeLogo.summary()).startsWith("Nothing in the catalogue fits");
+        }
+    }
+
+    @Test
+    void aDescriptionThatMatchesNothingSaysSo() {
+        RecommendationResponse response = recommendationService.recommend(
+                new RecommendationRequest("asdkjh qwe", null, List.of(), null, 3), null);
+
+        assertThat(response.recommendations()).isEmpty();
+        assertThat(response.summary()).startsWith("Nothing in the catalogue fits");
+    }
+
+    @Test
+    void anUnknownBudgetIsRejected() {
+        assertThatThrownBy(() -> recommendationService.recommend(
+                new RecommendationRequest("edit a podcast", null, List.of(), "WRONG", 3), null))
+                .isInstanceOf(BadRequestException.class);
     }
 
     @Test

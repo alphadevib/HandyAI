@@ -108,6 +108,10 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BadRequestException.class)
     public ResponseEntity<ApiErrorResponse> handleBadRequest(BadRequestException ex,
                                                              HttpServletRequest request) {
+        if (ex.getFieldErrors() != null) {
+            return ResponseEntity.badRequest().body(ApiErrorResponse.validation(ex.getMessage(),
+                    request.getRequestURI(), ex.getFieldErrors()));
+        }
         return status(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
     }
 
@@ -115,6 +119,18 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleUnauthorized(UnauthorizedException ex,
                                                                HttpServletRequest request) {
         return status(HttpStatus.UNAUTHORIZED, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<ApiErrorResponse> handleTooMany(TooManyRequestsException ex,
+                                                          HttpServletRequest request) {
+        return status(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ApiErrorResponse> handleForbidden(ForbiddenException ex,
+                                                            HttpServletRequest request) {
+        return status(HttpStatus.FORBIDDEN, ex.getMessage(), request);
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)

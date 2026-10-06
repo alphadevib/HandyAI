@@ -2,6 +2,7 @@ package com.handyai.build.config;
 
 import com.handyai.build.domain.AiTool;
 import com.handyai.build.domain.Category;
+import com.handyai.build.domain.PriceBook;
 import com.handyai.build.domain.PricingModel;
 import com.handyai.build.domain.Role;
 import com.handyai.build.domain.User;
@@ -51,6 +52,7 @@ public class CatalogueSeeder implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         Map<String, Category> categories = seedCategories();
         int inserted = seedTools(categories);
+        seedPrices();
         seedDemoUser();
         log.info("Catalogue ready: {} categories, {} tools ({} new this start)",
                 categoryRepository.count(), toolRepository.count(), inserted);
@@ -383,6 +385,66 @@ public class CatalogueSeeder implements ApplicationRunner {
                 "chatbots,support,customer service,helpdesk,automation", 53, false);
 
         return inserted[0];
+    }
+
+    /**
+     * Indicative list prices of each tool's entry paid plan in US dollars: {monthly, yearly}. A
+     * yearly figure below twelve months reflects the vendor's annual discount; {0, 0} means there
+     * is no paid plan. Backfilled onto existing rows too, so a database seeded before prices
+     * existed picks them up on the next start.
+     */
+    private static final Map<String, double[]> LIST_PRICES_USD = Map.ofEntries(
+            Map.entry("claude", new double[] {20, 204}),
+            Map.entry("perplexity", new double[] {20, 200}),
+            Map.entry("poe", new double[] {19.99, 199.99}),
+            Map.entry("github-copilot", new double[] {10, 100}),
+            Map.entry("cursor", new double[] {20, 192}),
+            Map.entry("codeium", new double[] {15, 180}),
+            Map.entry("sourcegraph-cody", new double[] {9, 108}),
+            Map.entry("grammarly", new double[] {30, 144}),
+            Map.entry("notion-ai", new double[] {10, 96}),
+            Map.entry("quillbot", new double[] {19.95, 99.95}),
+            Map.entry("sudowrite", new double[] {19, 192}),
+            Map.entry("midjourney", new double[] {10, 96}),
+            Map.entry("ideogram", new double[] {8, 84}),
+            Map.entry("leonardo-ai", new double[] {12, 120}),
+            Map.entry("clipdrop", new double[] {9, 84}),
+            Map.entry("figma-ai", new double[] {20, 192}),
+            Map.entry("gamma", new double[] {10, 96}),
+            Map.entry("uizard", new double[] {19, 144}),
+            Map.entry("descript", new double[] {24, 192}),
+            Map.entry("heygen", new double[] {29, 288}),
+            Map.entry("runway", new double[] {15, 144}),
+            Map.entry("opus-clip", new double[] {15, 108}),
+            Map.entry("elevenlabs", new double[] {5, 50}),
+            Map.entry("suno", new double[] {10, 96}),
+            Map.entry("adobe-podcast", new double[] {0, 0}),
+            Map.entry("fathom", new double[] {19, 180}),
+            Map.entry("otter-ai", new double[] {16.99, 99.96}),
+            Map.entry("mem", new double[] {12, 120}),
+            Map.entry("reclaim-ai", new double[] {10, 96}),
+            Map.entry("raycast-ai", new double[] {10, 96}),
+            Map.entry("elicit", new double[] {12, 120}),
+            Map.entry("napkin-ai", new double[] {12, 108}),
+            Map.entry("julius-ai", new double[] {20, 192}),
+            Map.entry("rows", new double[] {8, 96}),
+            Map.entry("jasper", new double[] {49, 468}),
+            Map.entry("surfer-seo", new double[] {99, 948}),
+            Map.entry("make", new double[] {10.59, 108}),
+            Map.entry("zapier-ai", new double[] {29.99, 239.88}),
+            Map.entry("tidio-lyro", new double[] {39, 348}));
+
+    private void seedPrices() {
+        for (AiTool tool : toolRepository.findAll()) {
+            double[] price = LIST_PRICES_USD.get(tool.getSlug());
+            if (price == null || tool.getPriceMonthlyUsd() != null) {
+                continue;
+            }
+            tool.setPriceMonthlyUsd(price[0]);
+            tool.setPriceAnnualUsd(price[1]);
+            tool.setPriceMonthlyInr(PriceBook.toInr(price[0]));
+            tool.setPriceAnnualInr(PriceBook.toInr(price[1]));
+        }
     }
 
     private void seedDemoUser() {

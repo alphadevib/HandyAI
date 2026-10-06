@@ -32,10 +32,22 @@ public interface AiToolRepository extends JpaRepository<AiTool, Long> {
                    or lower(t.tags) like :query)
               and (:categorySlug is null or t.category.slug = :categorySlug)
               and (:pricing is null or t.pricingModel = :pricing)
+              and (:freePlanOnly = false
+                   or t.pricingModel = com.handyai.build.domain.PricingModel.FREE
+                   or t.pricingModel = com.handyai.build.domain.PricingModel.FREEMIUM)
+              and (:minInr is null or t.priceMonthlyInr >= :minInr)
+              and (:maxInr is null or t.priceMonthlyInr <= :maxInr)
+              and (:minUsd is null or t.priceMonthlyUsd >= :minUsd)
+              and (:maxUsd is null or t.priceMonthlyUsd <= :maxUsd)
             """)
     Page<AiTool> search(@Param("query") String query,
                         @Param("categorySlug") String categorySlug,
                         @Param("pricing") PricingModel pricing,
+                        @Param("freePlanOnly") boolean freePlanOnly,
+                        @Param("minInr") Long minInr,
+                        @Param("maxInr") Long maxInr,
+                        @Param("minUsd") Double minUsd,
+                        @Param("maxUsd") Double maxUsd,
                         Pageable pageable);
 
     @EntityGraph(attributePaths = "category")

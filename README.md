@@ -1,10 +1,11 @@
 # HandyAI
 
-Find the AI tool that fits the job. Describe what you are trying to get done and HandyAI ranks a
-curated catalogue of AI platforms against it, with the reasons behind every pick.
+The marketplace for AI tools. Compare 39 platforms by price across monthly, quarterly and annual
+plans, get picks for your profession, ask the AI Chat (typed or spoken), and track every AI
+subscription you pay for in one place.
 
-- `backend/handy-ai` — Spring Boot 4.1 REST API (Java 17, JPA, H2 or MySQL)
-- `frontend` — React 19 + Vite single page app (home page and sign in / sign up)
+- `backend/handy-ai` — Spring Boot 4.1 REST API (Java 17, JPA, H2 locally, MySQL in production)
+- `frontend` — React 19 + Vite single page app, deployable to Vercel
 
 ## Running it
 
@@ -28,7 +29,26 @@ The app is on <http://localhost:5173>. The dev server proxies `/api` to port 808
 on the network too, so a phone on the same Wi-Fi can open `http://<your-ip>:5173` and see the
 mobile layout.
 
-Demo account: `demo@handyai.app` / `demo12345` (the sign-in page can fill it in for you).
+Demo account: `demo@handyai.app` / `demo12345` (the sign-in page can fill it in for you). It is
+only created locally; the production profile turns it off.
+
+### The admin account
+
+There is exactly one admin, set by `handyai.admin.email` (default
+`syedibrahimahmed.dev@gmail.com`). On every start the backend creates that account if it is
+missing, gives it the configured password, and removes the admin role from anyone else. The
+admin's **Admin dashboard** (account menu → `/admin`) shows live users, purchase redirects,
+registrations and tracked subscriptions, refreshing every 5 seconds, plus organisation
+verification.
+
+The password is never committed. Locally, create `backend/handy-ai/config/application.properties`
+(git-ignored) containing:
+
+```properties
+handyai.admin.password=your-password
+```
+
+In production set the `HANDYAI_ADMIN_PASSWORD` environment variable instead.
 
 ### Using MySQL instead
 
@@ -49,6 +69,36 @@ a persistent database inserts only what is missing.
 cd backend/handy-ai && ./mvnw test
 cd frontend && npm run lint && npm run build
 ```
+
+## Deploying
+
+Vercel hosts the frontend only; it cannot run the Java backend. Put the backend on a host that
+runs Docker (Render, Railway, Fly.io) with a MySQL database, then point the frontend at it.
+
+**1. Backend** — deploy `backend/handy-ai` with its `Dockerfile` (it runs the `prod` profile) and
+set these environment variables. The app refuses to start if a required one is missing.
+
+| Variable | Required | Value |
+| --- | --- | --- |
+| `HANDYAI_JWT_SECRET` | yes | 32+ random characters, e.g. `openssl rand -base64 48` |
+| `HANDYAI_ADMIN_PASSWORD` | yes | The admin's password |
+| `HANDYAI_CORS_ALLOWED_ORIGINS` | yes | Your Vercel URL(s), comma separated, e.g. `https://handyai.vercel.app` |
+| `MYSQL_HOST`, `MYSQL_USER`, `MYSQL_PASSWORD` | yes | From your MySQL provider |
+| `MYSQL_PORT`, `MYSQL_DB`, `MYSQL_SSL_MODE` | no | Default `3306`, `handyai`, `REQUIRED` |
+| `HANDYAI_ADMIN_EMAIL` | no | Defaults to `syedibrahimahmed.dev@gmail.com` |
+
+Check it with `https://<backend>/api/health`.
+
+**2. Frontend** — import the repo in Vercel with **Root Directory** `frontend` (the included
+`vercel.json` sets the build and makes page refreshes work on every route) and add the
+environment variable `VITE_API_BASE_URL=https://<backend>/api`. Redeploy after changing it: Vite
+bakes it in at build time.
+
+**What "live" means here.** Live users are browser tabs that sent a heartbeat in the last 75
+seconds, kept in the backend's memory, so run a single backend instance (or move presence to
+Redis before scaling out). A purchase redirect is a click on Buy / Try it, recorded as HandyAI
+hands the visitor to the vendor; the payment itself happens on the vendor's site and is not
+reported back without an affiliate programme.
 
 ## API
 
@@ -72,6 +122,14 @@ Everything lives under `/api`. Browsing is public; anything tied to a person nee
 | GET | `/categories`, `/categories/{slug}` | — | Categories with tool counts |
 | POST | `/recommendations` | optional | The matcher: `goal`, `profession`, `categorySlugs`, `pricing`, `limit` |
 | GET | `/stats`, `/health` | — | Counters and a liveness check |
+| GET | `/tools/price-ranges` | — | Marketplace price bands with counts, per `currency` |
+| GET | `/professions` | — | The 60 professions and 25 industries for sign-up |
+| POST | `/chat` | optional | One AI Chat turn: `message` plus the `context` from the last reply |
+| GET/POST/PUT/DELETE | `/me/subscriptions` | yes | Track, edit and remove your subscriptions |
+| POST | `/presence` | optional | Heartbeat behind the live-users count |
+| GET | `/go/{slug}` | — | Records a purchase redirect, then 302s to the vendor |
+| GET | `/admin/stats` | admin | Live dashboard numbers |
+| GET/POST | `/admin/organisations…` | admin | List, approve and reject organisations |
 
 Signing in only sharpens the results: a token adds your saved flag to every card and nudges
 recommendations towards the categories you favourite and rate highly.

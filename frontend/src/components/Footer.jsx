@@ -1,25 +1,30 @@
 import { Link } from '../router'
+import { BrandMark, Wordmark } from './Brand'
 
 export default function Footer() {
   return (
     <footer className="site-footer">
       <div className="footer-inner">
-        <div>
-          <p className="footer-brand">
-            Handy<strong>AI</strong>
-          </p>
+        <div className="footer-brand">
+          <span className="brand">
+            <BrandMark size={30} />
+            <Wordmark />
+          </span>
           <p className="footer-note">
-            A curated map of the AI platforms that quietly make a workday shorter.
+            The marketplace for AI tools, matched to the work you actually do.
           </p>
         </div>
         <nav className="footer-links" aria-label="Footer">
-          <a href="/#discover">Discover</a>
-          <a href="/#categories">Categories</a>
-          <a href="/#match">Find my tools</a>
-          <Link to="/login">Sign in</Link>
+          <Link to="/categories">Categories</Link>
+          <Link to="/marketplace">Marketplace</Link>
+          <Link to="/chat">AI Chat</Link>
+          <Link to="/subscriptions">My subscriptions</Link>
         </nav>
       </div>
-      <p className="footer-copy">Built with React and Spring Boot.</p>
+      <p className="footer-copy">
+        Prices are indicative list prices of each tool&apos;s entry plan; rupee amounts are converted
+        at a fixed rate. Purchases happen on the vendor&apos;s own website.
+      </p>
     </footer>
   )
 }

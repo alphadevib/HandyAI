@@ -1,24 +1,51 @@
 import { useEffect, useState } from 'react'
+import { BrandMark } from '../components/Brand'
+import { Icon } from '../components/Icons'
 import Message from '../components/Message'
+import ProfessionSelect from '../components/ProfessionSelect'
 import { useAuth } from '../context/AuthContext'
 import { Link, navigate } from '../router'
 
-const EMPTY = { name: '', email: '', password: '', profession: '' }
+const EMPTY = {
+  name: '',
+  email: '',
+  password: '',
+  profession: '',
+  accountType: 'INDIVIDUAL',
+  organisationName: '',
+  organisationWebsite: '',
+  organisationRegistrationId: '',
+}
+
+/** Only same-site paths are honoured, so a crafted history entry cannot send people elsewhere. */
+function safeReturnTo(value) {
+  return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//')
+    ? value
+    : '/'
+}
 
 export default function Login({ mode = 'login' }) {
   const { login, register, isAuthenticated } = useAuth()
   const isSignup = mode === 'signup'
+
+  // Whoever sent the visitor here can explain why and say where to go back to afterwards.
+  const [{ notice, returnTo }] = useState(() => {
+    const state = window.history.state ?? {}
+    return { notice: state.notice ?? '', returnTo: safeReturnTo(state.returnTo) }
+  })
 
   const [form, setForm] = useState(EMPTY)
   const [fieldErrors, setFieldErrors] = useState({})
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const isOrganisation = isSignup && form.accountType === 'ORGANISATION'
 
-  // Someone who is already signed in has no business on this screen.
+  // Someone who is already signed in has no business on this screen. This also runs right after
+  // a successful sign in or sign up, and replaces the entry so Back does not return to the form.
   useEffect(() => {
-    if (isAuthenticated) navigate('/', { replace: true })
-  }, [isAuthenticated])
+    if (isAuthenticated) navigate(returnTo, { replace: true })
+  }, [isAuthenticated, returnTo])
 
   // Switching between the two modes clears whatever the other form complained about.
   const [lastMode, setLastMode] = useState(mode)
@@ -28,11 +55,11 @@ export default function Login({ mode = 'login' }) {
     setError('')
   }
 
-  const update = (key) => (event) => {
-    const { value } = event.target
+  const set = (key, value) => {
     setForm((current) => ({ ...current, [key]: value }))
     setFieldErrors((current) => ({ ...current, [key]: undefined }))
   }
+  const update = (key) => (event) => set(key, event.target.value)
 
   const onSubmit = async (event) => {
     event.preventDefault()
@@ -46,11 +73,16 @@ export default function Login({ mode = 'login' }) {
           email: form.email.trim(),
           password: form.password,
           profession: form.profession.trim(),
+          accountType: form.accountType,
+          ...(isOrganisation && {
+            organisationName: form.organisationName.trim(),
+            organisationWebsite: form.organisationWebsite.trim(),
+            organisationRegistrationId: form.organisationRegistrationId.trim(),
+          }),
         })
       } else {
         await login({ email: form.email.trim(), password: form.password })
       }
-      navigate('/')
     } catch (submitError) {
       setError(submitError.message)
       setFieldErrors(submitError.fieldErrors ?? {})
@@ -65,24 +97,53 @@ export default function Login({ mode = 'login' }) {
     setFieldErrors({})
   }
 
+  const fieldError = (key) =>
+    fieldErrors[key] && <small className="field-error">{fieldErrors[key]}</small>
+
   return (
     <section className="auth">
       <div className="auth-card">
         <header className="auth-head">
-          <h1>{isSignup ? 'Create your HandyAI account' : 'Welcome back'}</h1>
+          <BrandMark size={44} />
+          <h1>{isSignup ? 'Create your HandyAI profile' : 'Welcome back'}</h1>
           <p>
             {isSignup
-              ? 'Save the tools you like and get suggestions shaped by what you actually use.'
-              : 'Sign in to pick up your saved tools and personalised matches.'}
+              ? 'Tell us what you do and the marketplace will lead with the tools that fit.'
+              : 'Sign in to see your picks, saved tools and subscriptions.'}
           </p>
         </header>
 
+        {!error && <Message tone="info">{notice}</Message>}
         <Message>{error}</Message>
 
         <form onSubmit={onSubmit} noValidate>
           {isSignup && (
+            <div className="segmented" role="radiogroup" aria-label="Account type">
+              {[
+                { value: 'INDIVIDUAL', label: 'Individual', hint: 'For yourself' },
+                { value: 'ORGANISATION', label: 'Organisation', hint: 'Company or team, verified' },
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={form.accountType === option.value}
+                  className={form.accountType === option.value ? 'is-active' : ''}
+                  onClick={() => {
+                    set('accountType', option.value)
+                    set('profession', '')
+                  }}
+                >
+                  <strong>{option.label}</strong>
+                  <span>{option.hint}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {isSignup && (
             <label className="field">
-              <span>Name</span>
+              <span>{isOrganisation ? 'Your name (account admin)' : 'Name'}</span>
               <input
                 type="text"
                 value={form.name}
@@ -92,23 +153,26 @@ export default function Login({ mode = 'login' }) {
                 required
                 aria-invalid={Boolean(fieldErrors.name)}
               />
-              {fieldErrors.name && <small className="field-error">{fieldErrors.name}</small>}
+              {fieldError('name')}
             </label>
           )}
 
           <label className="field">
-            <span>Email</span>
+            <span>{isOrganisation ? 'Work email' : 'Email'}</span>
             <input
               type="email"
               value={form.email}
               onChange={update('email')}
               autoComplete="email"
               inputMode="email"
-              placeholder="you@example.com"
+              placeholder={isOrganisation ? 'you@yourcompany.com' : 'you@example.com'}
               required
               aria-invalid={Boolean(fieldErrors.email)}
             />
-            {fieldErrors.email && <small className="field-error">{fieldErrors.email}</small>}
+            {isOrganisation && !fieldErrors.email && (
+              <small className="field-hint">Must be on your organisation&apos;s own domain.</small>
+            )}
+            {fieldError('email')}
           </label>
 
           <label className="field">
@@ -131,27 +195,76 @@ export default function Login({ mode = 'login' }) {
                 {showPassword ? 'Hide' : 'Show'}
               </button>
             </span>
-            {fieldErrors.password && (
-              <small className="field-error">{fieldErrors.password}</small>
-            )}
+            {fieldError('password')}
           </label>
 
           {isSignup && (
-            <label className="field">
-              <span>What do you do? (optional)</span>
-              <input
-                type="text"
+            <label className="field" htmlFor="profession">
+              <span>{isOrganisation ? 'Industry' : 'Profession'}</span>
+              <ProfessionSelect
+                id="profession"
+                kind={isOrganisation ? 'industry' : 'profession'}
                 value={form.profession}
-                onChange={update('profession')}
-                placeholder="Designer, teacher, founder…"
-                maxLength={120}
+                onChange={(value) => set('profession', value)}
+                invalid={Boolean(fieldErrors.profession)}
               />
-              <small className="field-hint">Used to tune your suggestions. Change it anytime.</small>
+              {fieldErrors.profession ? (
+                fieldError('profession')
+              ) : (
+                <small className="field-hint">Used to pick your tools. You can change it any time.</small>
+              )}
             </label>
           )}
 
+          {isOrganisation && (
+            <fieldset className="org-fields">
+              <legend>
+                <Icon name="shield" size={18} /> Organisation verification
+              </legend>
+              <label className="field">
+                <span>Registered name</span>
+                <input
+                  type="text"
+                  value={form.organisationName}
+                  onChange={update('organisationName')}
+                  placeholder="Acme Technologies Pvt Ltd"
+                  aria-invalid={Boolean(fieldErrors.organisationName)}
+                />
+                {fieldError('organisationName')}
+              </label>
+              <label className="field">
+                <span>Website</span>
+                <input
+                  type="text"
+                  inputMode="url"
+                  value={form.organisationWebsite}
+                  onChange={update('organisationWebsite')}
+                  placeholder="acme.com"
+                  aria-invalid={Boolean(fieldErrors.organisationWebsite)}
+                />
+                {fieldError('organisationWebsite')}
+              </label>
+              <label className="field">
+                <span>GSTIN, CIN or LLPIN</span>
+                <input
+                  type="text"
+                  value={form.organisationRegistrationId}
+                  onChange={update('organisationRegistrationId')}
+                  placeholder="27AAPFU0939F1ZV"
+                  autoCapitalize="characters"
+                  aria-invalid={Boolean(fieldErrors.organisationRegistrationId)}
+                />
+                {fieldError('organisationRegistrationId')}
+              </label>
+              <p className="field-hint">
+                We check the details automatically, then a HandyAI admin verifies your organisation.
+                You can use the marketplace while it is pending.
+              </p>
+            </fieldset>
+          )}
+
           <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={submitting}>
-            {submitting ? 'Just a moment…' : isSignup ? 'Create account' : 'Sign in'}
+            {submitting ? 'Just a moment…' : isSignup ? 'Create profile' : 'Sign in'}
           </button>
         </form>
 
@@ -164,37 +277,51 @@ export default function Login({ mode = 'login' }) {
         <p className="auth-switch">
           {isSignup ? (
             <>
-              Already have an account? <Link to="/login">Sign in</Link>
+              Already have an account?{' '}
+              <Link to="/login" state={{ notice, returnTo }}>
+                Sign in
+              </Link>
             </>
           ) : (
             <>
-              New here? <Link to="/signup">Create a free account</Link>
+              New here?{' '}
+              <Link to="/signup" state={{ notice, returnTo }}>
+                Create a free profile
+              </Link>
             </>
           )}
         </p>
         <p className="auth-switch">
-          <Link to="/">Keep browsing without an account</Link>
+          <Link to={returnTo}>Keep browsing as a guest</Link>
         </p>
       </div>
 
       <aside className="auth-aside" aria-label="Why sign up">
-        <h2>Why bother signing in?</h2>
+        <h2>What a profile gets you</h2>
         <ul>
           <li>
-            <strong>Keep a shortlist.</strong> Save anything you want to try later instead of
-            re-finding it.
+            <Icon name="spark" size={20} />
+            <span>
+              <strong>Picks for your profession.</strong> 60 professions and 25 industries, each
+              mapped to the tools that matter for that work.
+            </span>
           </li>
           <li>
-            <strong>Better matches.</strong> Suggestions lean towards the categories you already
-            rate highly.
+            <Icon name="wallet" size={20} />
+            <span>
+              <strong>All your subscriptions in one place.</strong> See what you spend each month
+              and when each plan renews.
+            </span>
           </li>
           <li>
-            <strong>Share what works.</strong> Rate a tool and help the next person skip the duds.
+            <Icon name="shield" size={20} />
+            <span>
+              <strong>Verified organisations.</strong> Teams get a verified badge once an admin
+              confirms their registration.
+            </span>
           </li>
         </ul>
-        <p className="auth-aside-note">
-          Browsing, searching and matching all work without an account.
-        </p>
+        <p className="auth-aside-note">Browsing the marketplace and the AI Chat work without an account.</p>
       </aside>
     </section>
   )

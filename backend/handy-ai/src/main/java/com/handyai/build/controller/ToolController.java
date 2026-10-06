@@ -45,10 +45,23 @@ public class ToolController {
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String pricing,
+            @RequestParam(defaultValue = "false") boolean freePlan,
+            @RequestParam(required = false) Double priceMin,
+            @RequestParam(required = false) Double priceMax,
+            @RequestParam(required = false) String currency,
+            @RequestParam(required = false) String cycle,
             @RequestParam(required = false, defaultValue = "popular") String sort,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size) {
-        return toolService.search(q, category, pricing, sort, page, size, currentUserId());
+        return toolService.search(q, category, pricing, freePlan, priceMin, priceMax, currency,
+                cycle, sort, page, size, currentUserId());
+    }
+
+    /** The price filter options for the marketplace, with how many tools fall in each. */
+    @GetMapping("/price-ranges")
+    public ToolService.PriceRanges priceRanges(
+            @RequestParam(required = false) String currency) {
+        return toolService.priceRanges(currency);
     }
 
     @GetMapping("/featured")

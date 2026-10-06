@@ -1,0 +1,14 @@
+# Secrets and machine-local configuration: never commit these.
+.env
+.env.*
+!.env.example
+backend/handy-ai/config/
+
+# Build output
+backend/**/target/
+frontend/dist/
+
+# Editor and OS files
+.idea/
+.DS_Store
+Thumbs.db

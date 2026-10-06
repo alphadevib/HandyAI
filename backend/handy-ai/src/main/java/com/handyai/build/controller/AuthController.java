@@ -49,10 +49,15 @@ public class AuthController {
     @PutMapping("/me")
     public UserResponse updateMe(@Valid @RequestBody UpdateProfileRequest request) {
         return authService.updateProfile(currentUserProvider.requireUserId(), request.name(),
-                request.profession());
+                request.profession(), request.organisationName(), request.organisationWebsite(),
+                request.organisationRegistrationId());
     }
 
+    /** Every field is optional; only the ones sent are changed. */
     public record UpdateProfileRequest(@Size(min = 2, max = 80) String name,
-                                       @Size(max = 120) String profession) {
+                                       @Size(max = 120) String profession,
+                                       @Size(max = 160) String organisationName,
+                                       @Size(max = 200) String organisationWebsite,
+                                       @Size(max = 40) String organisationRegistrationId) {
     }
 }
