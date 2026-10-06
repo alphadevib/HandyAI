@@ -17,6 +17,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import org.springframework.data.core.TypedPropertyPath;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -214,17 +215,27 @@ public class ToolService {
      */
     private Sort sortFor(String sort, Currency currency, String cycle) {
         String key = sort == null ? "popular" : sort.trim().toLowerCase(Locale.ROOT);
-        boolean annual = "ANNUAL".equalsIgnoreCase(cycle);
-        String priceColumn = "price" + (annual ? "Annual" : "Monthly")
-                + (currency == Currency.INR ? "Inr" : "Usd");
+        // Property references rather than strings, so a renamed field fails the build instead of
+        // failing the first request that sorts by it.
+        Sort byName = Sort.by(AiTool::getName);
         return switch (key) {
-            case "price_asc" -> Sort.by(Sort.Direction.ASC, priceColumn).and(Sort.by("name"));
-            case "price_desc" -> Sort.by(Sort.Direction.DESC, priceColumn).and(Sort.by("name"));
-            case "name" -> Sort.by(Sort.Direction.ASC, "name");
-            case "newest" -> Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by("id").descending());
-            case "rating" -> Sort.by(Sort.Direction.DESC, "ratingSum", "popularity");
-            case "", "popular" -> Sort.by(Sort.Direction.DESC, "popularity").and(Sort.by("name"));
+            case "price_asc" -> Sort.by(Sort.Direction.ASC, priceProperty(currency, cycle)).and(byName);
+            case "price_desc" -> Sort.by(Sort.Direction.DESC, priceProperty(currency, cycle)).and(byName);
+            case "name" -> byName;
+            case "newest" -> Sort.by(Sort.Direction.DESC, AiTool::getCreatedAt, AiTool::getId);
+            case "rating" -> Sort.by(Sort.Direction.DESC, AiTool::getRatingAverage,
+                    AiTool::getRatingCount, AiTool::getPopularity);
+            case "", "popular" -> Sort.by(Sort.Direction.DESC, AiTool::getPopularity).and(byName);
             default -> throw new BadRequestException("Unknown sort option: " + sort);
         };
+    }
+
+    private static TypedPropertyPath<AiTool, ? extends Number> priceProperty(Currency currency,
+                                                                            String cycle) {
+        boolean annual = "ANNUAL".equalsIgnoreCase(cycle);
+        if (currency == Currency.INR) {
+            return annual ? AiTool::getPriceAnnualInr : AiTool::getPriceMonthlyInr;
+        }
+        return annual ? AiTool::getPriceAnnualUsd : AiTool::getPriceMonthlyUsd;
     }
 }

@@ -1,5 +1,8 @@
 import { Link } from '../router'
 import { BrandMark, Wordmark } from './Brand'
+import { openSuggestions } from './SuggestionDialog'
+
+/* global __APP_BUILD__ */
 
 export default function Footer() {
   return (
@@ -19,11 +22,14 @@ export default function Footer() {
           <Link to="/marketplace">Marketplace</Link>
           <Link to="/chat">AI Chat</Link>
           <Link to="/subscriptions">My subscriptions</Link>
+          <button type="button" className="text-link" onClick={openSuggestions}>
+            Suggest a feature
+          </button>
         </nav>
       </div>
       <p className="footer-copy">
         Prices are indicative list prices of each tool&apos;s entry plan; rupee amounts are converted
-        at a fixed rate. Purchases happen on the vendor&apos;s own website.
+        at a fixed rate. Purchases happen on the vendor&apos;s own website. · v{__APP_BUILD__.version}
       </p>
     </footer>
   )

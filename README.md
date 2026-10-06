@@ -94,6 +94,33 @@ Check it with `https://<backend>/api/health`.
 environment variable `VITE_API_BASE_URL=https://<backend>/api`. Redeploy after changing it: Vite
 bakes it in at build time.
 
+**3. Your own domain (e.g. `handyai.tech`)** — in Vercel open Project → Settings → Domains, add
+the domain, and create the DNS records Vercel shows at your registrar (usually an `A` record
+`76.76.21.21` for the bare domain and a `CNAME` `cname.vercel-dns.com` for `www`). HTTPS is issued
+automatically. Then add the new address to `HANDYAI_CORS_ALLOWED_ORIGINS` on the backend, e.g.
+`https://handyai.tech,https://www.handyai.tech,https://handyai.vercel.app`. Optionally give the
+backend `api.handyai.tech` through your backend host's custom-domain setting and point
+`VITE_API_BASE_URL` at it.
+
+### Releasing a new version
+
+1. Bump `"version"` in `frontend/package.json` (e.g. `2.1.0`).
+2. Add an entry at the top of `frontend/src/releases.js` with the same version, a title and the
+   highlights.
+3. Push; Vercel deploys.
+
+Every open tab checks `/version.json` every two minutes and when it is brought back to the front.
+When the deployment changes it shows a "HandyAI just got better" bar and refreshes itself after 15
+seconds (it waits while someone is typing), or at the next page change. Each visitor sees the
+release notes once, during the 48 hours after the deployment. First-time visitors get a welcome
+note instead.
+
+### Suggestions
+
+Anyone can send an idea, tool request or bug report from the footer, the welcome note or "What's
+new". Only the admin can read them, under Admin dashboard → Suggestions, and move each one to
+Planned, Done or Dismissed. One sender may send five every ten minutes.
+
 **What "live" means here.** Live users are browser tabs that sent a heartbeat in the last 75
 seconds, kept in the backend's memory, so run a single backend instance (or move presence to
 Redis before scaling out). A purchase redirect is a click on Buy / Try it, recorded as HandyAI
@@ -130,6 +157,8 @@ Everything lives under `/api`. Browsing is public; anything tied to a person nee
 | GET | `/go/{slug}` | — | Records a purchase redirect, then 302s to the vendor |
 | GET | `/admin/stats` | admin | Live dashboard numbers |
 | GET/POST | `/admin/organisations…` | admin | List, approve and reject organisations |
+| POST | `/suggestions` | optional | Send a suggestion (5 per sender per 10 minutes) |
+| GET/PUT | `/admin/suggestions…` | admin | Read suggestions and set their status |
 
 Signing in only sharpens the results: a token adds your saved flag to every card and nudges
 recommendations towards the categories you favourite and rate highly.

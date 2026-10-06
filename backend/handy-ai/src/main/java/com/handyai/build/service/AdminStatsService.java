@@ -8,6 +8,8 @@ import com.handyai.build.domain.VerificationStatus;
 import com.handyai.build.exception.ForbiddenException;
 import com.handyai.build.repository.OutboundClickRepository;
 import com.handyai.build.repository.SubscriptionRepository;
+import com.handyai.build.repository.SuggestionRepository;
+import com.handyai.build.domain.Suggestion;
 import com.handyai.build.repository.UserRepository;
 import java.time.Duration;
 import java.time.Instant;
@@ -31,15 +33,18 @@ public class AdminStatsService {
     private final SubscriptionRepository subscriptionRepository;
     private final OutboundClickRepository clickRepository;
     private final PresenceService presenceService;
+    private final SuggestionRepository suggestionRepository;
 
     public AdminStatsService(UserRepository userRepository,
                              SubscriptionRepository subscriptionRepository,
                              OutboundClickRepository clickRepository,
-                             PresenceService presenceService) {
+                             PresenceService presenceService,
+                             SuggestionRepository suggestionRepository) {
         this.userRepository = userRepository;
         this.subscriptionRepository = subscriptionRepository;
         this.clickRepository = clickRepository;
         this.presenceService = presenceService;
+        this.suggestionRepository = suggestionRepository;
     }
 
     public record Users(long total, long today, long last7Days, long individuals,
@@ -61,7 +66,7 @@ public class AdminStatsService {
 
     public record Stats(Instant generatedAt, PresenceService.LiveCount live, Users users,
                         Redirects redirects, TrackedSubscriptions subscriptions,
-                        List<Activity> recent) {
+                        long newSuggestions, List<Activity> recent) {
     }
 
     /**
@@ -108,7 +113,8 @@ public class AdminStatsService {
                 subscriptionRepository.countByStatus(Subscription.Status.CANCELLED),
                 subscriptionRepository.countByCreatedAtAfter(startOfToday));
 
-        return new Stats(now, presenceService.live(), users, redirects, subscriptions, recent());
+        return new Stats(now, presenceService.live(), users, redirects, subscriptions,
+                suggestionRepository.countByStatus(Suggestion.Status.NEW), recent());
     }
 
     /** The latest sign-ups, redirects and tracked plans, newest first. */

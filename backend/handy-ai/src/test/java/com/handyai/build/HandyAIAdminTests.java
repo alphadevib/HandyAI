@@ -14,7 +14,9 @@ import com.handyai.build.exception.UnauthorizedException;
 import com.handyai.build.repository.UserRepository;
 import com.handyai.build.service.AdminStatsService;
 import com.handyai.build.service.AuthService;
+import com.handyai.build.exception.BadRequestException;
 import com.handyai.build.service.PresenceService;
+import com.handyai.build.service.SuggestionService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -40,6 +42,9 @@ class HandyAIAdminTests {
 
     @Autowired
     private AdminAccountInitializer adminInitializer;
+
+    @Autowired
+    private SuggestionService suggestionService;
 
     @Test
     void onlyTheConfiguredEmailIsAdmin() throws Exception {
@@ -76,6 +81,26 @@ class HandyAIAdminTests {
                 new LoginRequest("guessed@handyai.test", "supersecret")))
                 .isInstanceOf(TooManyRequestsException.class)
                 .hasMessageContaining("minutes");
+    }
+
+    @Test
+    void suggestionsAreTakenFromAnyoneAndShownOnlyToTheAdmin() {
+        suggestionService.submit("TOOL_REQUEST", "Please add Canva to the design category", null,
+                "guest@example.com", "/marketplace", null, "203.0.113.7");
+        assertThat(suggestionService.list("NEW"))
+                .anySatisfy(item -> assertThat(item.message()).contains("Canva"));
+        assertThat(statsService.stats().newSuggestions()).isGreaterThanOrEqualTo(1);
+
+        assertThatThrownBy(() -> suggestionService.submit(null, "hi", null, null, null, null, "x"))
+                .isInstanceOf(BadRequestException.class);
+
+        // A sixth message from one address inside ten minutes is refused.
+        for (int i = 0; i < 4; i++) {
+            suggestionService.submit("IDEA", "Idea number " + i, null, null, "/", null, "198.51.100.9");
+        }
+        suggestionService.submit("IDEA", "Idea number five", null, null, "/", null, "198.51.100.9");
+        assertThatThrownBy(() -> suggestionService.submit("IDEA", "One idea too many", null, null,
+                "/", null, "198.51.100.9")).isInstanceOf(TooManyRequestsException.class);
     }
 
     @Test

@@ -1,3 +1,6 @@
+import Announcements from './components/Announcements'
+import FloatingBars from './components/FloatingBars'
+import SuggestionDialog from './components/SuggestionDialog'
 import Footer from './components/Footer'
 import Navbar from './components/Navbar'
 import Spinner from './components/Spinner'
@@ -77,6 +80,16 @@ function Routes() {
   }
 }
 
+/** Re-keyed on every route so each page fades in instead of snapping into place. */
+function PageTransition({ children }) {
+  const path = useRoute()
+  return (
+    <main id="main" key={path} className="page-enter">
+      {children}
+    </main>
+  )
+}
+
 /** Lives inside AuthProvider so a heartbeat carries the signed-in user's token. */
 function Presence() {
   usePresence()
@@ -90,10 +103,13 @@ export default function App() {
         <Presence />
         <div className="app-shell">
           <Navbar />
-          <main id="main">
+          <PageTransition>
             <Routes />
-          </main>
+          </PageTransition>
           <Footer />
+          <FloatingBars />
+          <Announcements />
+          <SuggestionDialog />
         </div>
       </PrefsProvider>
     </AuthProvider>

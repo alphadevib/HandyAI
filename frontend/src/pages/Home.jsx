@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api/client'
+import { BrandMark } from '../components/Brand'
 import { Icon, CategoryIcon } from '../components/Icons'
 import Message from '../components/Message'
 import ProductCard from '../components/ProductCard'
@@ -74,13 +75,24 @@ export default function Home() {
           <p className="eyebrow">
             <Icon name="spark" size={16} /> The AI tools marketplace
           </p>
-          <h1>
-            Every AI tool your work needs, <span className="accent">matched to what you do.</span>
+          <h1 className="hero-title">
+            <span className="strong">Every AI Tool</span> <span className="thin">your</span>{' '}
+            <span className="thin">work needs,</span> <span className="strong">Matched</span>{' '}
+            <span className="thin">to</span> <span className="strong accent">You</span>
+            <span className="hero-seal" aria-hidden="true">
+              <Icon name="check" size={18} />
+            </span>
           </h1>
-          <p className="lede">
-            Compare {stats?.toolCount ?? 'dozens of'} AI platforms by price, see monthly, quarterly
-            and annual plans side by side, and keep every subscription in one place.
-          </p>
+
+          <div className="hero-cta">
+            <Link to="/marketplace" className="btn btn-dark btn-lg">
+              Explore now <Icon name="external" size={18} />
+            </Link>
+            <p>
+              Compare {stats?.toolCount ?? 'dozens of'} AI platforms by price, with monthly,
+              quarterly and annual plans side by side.
+            </p>
+          </div>
 
           <form className="hero-search" onSubmit={submitSearch} role="search">
             <Icon name="search" size={20} />
@@ -98,42 +110,53 @@ export default function Home() {
               Search
             </button>
           </form>
-
-          <div className="hero-actions">
-            <Link to="/chat" className="btn btn-secondary">
-              <Icon name="mic" size={18} /> Ask HandyAI by voice or chat
-            </Link>
-            <Link to="/marketplace?freePlan=true" className="btn btn-ghost">
-              Browse free tools
-            </Link>
-          </div>
-
-          {stats && (
-            <dl className="hero-stats">
-              <div>
-                <dt>AI tools</dt>
-                <dd>{stats.toolCount}</dd>
-              </div>
-              <div>
-                <dt>Categories</dt>
-                <dd>{stats.categoryCount}</dd>
-              </div>
-              <div>
-                <dt>Members</dt>
-                <dd>{stats.userCount}</dd>
-              </div>
-            </dl>
-          )}
         </div>
 
-        <div className="hero-wall" aria-hidden="true">
+        <div className="hero-orbit" aria-hidden="true">
+          <span className="orbit-ring" />
+          <span className="orbit-ring orbit-ring-2" />
+          <span className="orbit-core">
+            <BrandMark size={84} />
+          </span>
           {showcase.map((tool, index) => (
-            <span key={tool.slug} className="wall-tile" style={{ '--i': index }}>
-              <ToolLogo tool={tool} size={44} />
-              <span>{tool.name}</span>
+            <span key={tool.slug} className="orbit-tile" style={{ '--i': index, '--n': showcase.length }}>
+              <ToolLogo tool={tool} size={42} />
+              <span className="orbit-name">{tool.name}</span>
             </span>
           ))}
         </div>
+      </section>
+
+      <section className="feature-strip" aria-label="Highlights">
+        <Link to={isAuthenticated ? '/profile' : '/signup'} className="feature-cell">
+          <span>
+            <strong>Start your personalised path</strong> to the right AI stack
+          </span>
+          <span className="feature-link">
+            {isAuthenticated ? 'Set your profession' : 'Create a profile'} <Icon name="external" size={14} />
+          </span>
+        </Link>
+        <Link to="/chat" className="feature-cell">
+          <span className="feature-icon">
+            <Icon name="mic" size={22} />
+          </span>
+          <span>
+            <strong>Just say it.</strong> Ask our AI Chat by voice and get tools picked for the job.
+          </span>
+        </Link>
+        <Link to="/marketplace" className="feature-cell feature-dark">
+          <span className="logo-stack">
+            {showcase.slice(0, 3).map((tool) => (
+              <ToolLogo key={tool.slug} tool={tool} size={36} />
+            ))}
+          </span>
+          <span>
+            <strong className="feature-big">+{stats?.toolCount ?? 39}</strong>
+            <span className="feature-small">
+              AI tools compared · {stats?.userCount ?? 0} members
+            </span>
+          </span>
+        </Link>
       </section>
 
       <Message>{error || favorites.error}</Message>

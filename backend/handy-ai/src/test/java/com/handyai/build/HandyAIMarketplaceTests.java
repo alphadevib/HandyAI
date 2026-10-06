@@ -15,7 +15,9 @@ import com.handyai.build.exception.ConflictException;
 import com.handyai.build.exception.ResourceNotFoundException;
 import com.handyai.build.service.AdminService;
 import com.handyai.build.service.AuthService;
+import com.handyai.build.dto.ReviewRequest;
 import com.handyai.build.service.ChatService;
+import com.handyai.build.service.ReviewService;
 import com.handyai.build.service.SubscriptionService;
 import com.handyai.build.service.ToolService;
 import java.time.LocalDate;
@@ -42,6 +44,9 @@ class HandyAIMarketplaceTests {
 
     @Autowired
     private ChatService chatService;
+
+    @Autowired
+    private ReviewService reviewService;
 
     @Test
     void offersAtLeastFiftyProfessions() {
@@ -80,6 +85,21 @@ class HandyAIMarketplaceTests {
         assertThat(ranges.ranges()).isNotEmpty();
         assertThat(ranges.ranges().get(ranges.ranges().size() - 1).max())
                 .isGreaterThanOrEqualTo(ranges.highestMonthly());
+    }
+
+    @Test
+    void bestRatedSortsByAverageNotTotalStars() {
+        for (int i = 0; i < 3; i++) {
+            Long voter = register("voter" + i + "@handyai.test", "Student").user().id();
+            reviewService.upsert("rows", voter, new ReviewRequest(3, "fine"));
+        }
+        Long fan = register("fan@handyai.test", "Student").user().id();
+        reviewService.upsert("mem", fan, new ReviewRequest(5, "great"));
+
+        List<String> order = toolService.search(null, null, null, "rating", 0, 60, null).content()
+                .stream().map(tool -> tool.slug()).toList();
+        // Rows has more stars in total (9 against 5) but a lower average.
+        assertThat(order.indexOf("mem")).isLessThan(order.indexOf("rows"));
     }
 
     @Test

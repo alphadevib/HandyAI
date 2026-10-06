@@ -141,6 +141,11 @@ export const api = {
     request('/presence', { method: 'POST', body: { visitorId, path } }).catch(() => null),
   adminStats: (signal) => request('/admin/stats', { signal }),
 
+  suggest: (payload) => request('/suggestions', { method: 'POST', body: payload }),
+  suggestions: (status, signal) => request(`/admin/suggestions${query({ status })}`, { signal }),
+  updateSuggestion: (id, status) =>
+    request(`/admin/suggestions/${id}`, { method: 'PUT', body: { status } }),
+
   organisations: (status, signal) => request(`/admin/organisations${query({ status })}`, { signal }),
   approveOrganisation: (id) => request(`/admin/organisations/${id}/approve`, { method: 'POST' }),
   rejectOrganisation: (id, reason) =>

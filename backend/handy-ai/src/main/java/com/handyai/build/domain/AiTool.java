@@ -15,6 +15,7 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import org.hibernate.annotations.Formula;
 
 /**
  * A single AI platform/tool that can be recommended to a user.
@@ -89,6 +90,13 @@ public class AiTool {
 
     @Column(name = "rating_count", nullable = false)
     private int ratingCount;
+
+    /**
+     * The average rating, computed by the database so "best rated" can sort on it. Sorting on the
+     * stored sum instead would rank ten 3-star reviews above five 5-star ones.
+     */
+    @Formula("case when rating_count = 0 then 0 else rating_sum * 1.0 / rating_count end")
+    private double ratingAverage;
 
     @Column(name = "featured", nullable = false)
     private boolean featured;
@@ -252,6 +260,10 @@ public class AiTool {
 
     public void setRatingCount(int ratingCount) {
         this.ratingCount = ratingCount;
+    }
+
+    public double getRatingAverage() {
+        return ratingAverage;
     }
 
     public boolean isFeatured() {

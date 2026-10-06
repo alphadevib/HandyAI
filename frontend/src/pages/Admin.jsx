@@ -8,6 +8,7 @@ const POLL_MS = 5000
 
 const VIEWS = [
   { value: 'dashboard', label: 'Live dashboard' },
+  { value: 'suggestions', label: 'Suggestions' },
   { value: 'organisations', label: 'Verify organisations' },
 ]
 
@@ -37,7 +38,9 @@ export default function Admin() {
         ))}
       </div>
 
-      {view === 'dashboard' ? <Dashboard /> : <Organisations />}
+      {view === 'dashboard' && <Dashboard onOpenSuggestions={() => setView('suggestions')} />}
+      {view === 'suggestions' && <Suggestions />}
+      {view === 'organisations' && <Organisations />}
     </section>
   )
 }
@@ -57,7 +60,7 @@ function ago(iso, now) {
  * Polls the stats every few seconds while the tab is visible. Polling rather than a socket keeps
  * it working behind Vercel's proxy and any host's load balancer without special configuration.
  */
-function Dashboard() {
+function Dashboard({ onOpenSuggestions }) {
   const [stats, setStats] = useState(null)
   const [error, setError] = useState('')
   const [now, setNow] = useState(() => Date.now())
@@ -139,6 +142,13 @@ function Dashboard() {
             active · {subscriptions.addedToday} added today · {subscriptions.cancelled} cancelled
           </span>
         </div>
+        <button type="button" className="kpi kpi-button" onClick={onOpenSuggestions}>
+          <span className="kpi-label">
+            <Icon name="chat" size={18} /> New suggestions
+          </span>
+          <strong>{number.format(stats.newSuggestions)}</strong>
+          <span className="kpi-sub">Open the suggestion box →</span>
+        </button>
       </div>
 
       <div className="dashboard-cols">
@@ -201,6 +211,125 @@ function Dashboard() {
         plans members recorded in My subscriptions.
       </p>
     </div>
+  )
+}
+
+const SUGGESTION_TABS = [
+  { value: 'NEW', label: 'New' },
+  { value: 'PLANNED', label: 'Planned' },
+  { value: 'DONE', label: 'Done' },
+  { value: 'DISMISSED', label: 'Dismissed' },
+]
+
+const CATEGORY_LABELS = {
+  IDEA: 'Idea',
+  TOOL_REQUEST: 'Tool request',
+  BUG: 'Bug',
+  OTHER: 'Other',
+}
+
+/** The suggestion box, readable only here. Each item moves New → Planned → Done, or Dismissed. */
+function Suggestions() {
+  const [status, setStatus] = useState('NEW')
+  const [items, setItems] = useState(null)
+  const [error, setError] = useState('')
+  const [now] = useState(() => Date.now())
+
+  useEffect(() => {
+    const controller = new AbortController()
+    api
+      .suggestions(status, controller.signal)
+      .then(setItems)
+      .catch((loadError) => {
+        if (loadError.name !== 'AbortError') setError(loadError.message)
+      })
+    return () => controller.abort()
+  }, [status])
+
+  const move = async (item, next) => {
+    setError('')
+    try {
+      await api.updateSuggestion(item.id, next)
+      setItems((current) => current.filter((entry) => entry.id !== item.id))
+    } catch (moveError) {
+      setError(moveError.message)
+    }
+  }
+
+  return (
+    <>
+      <p className="lede">
+        Ideas, tool requests and bug reports from visitors. Only you can see this list.
+      </p>
+      <div className="tabs tabs-sm" role="tablist">
+        {SUGGESTION_TABS.map((tab) => (
+          <button
+            key={tab.value}
+            type="button"
+            role="tab"
+            aria-selected={status === tab.value}
+            className={status === tab.value ? 'is-active' : ''}
+            onClick={() => {
+              setItems(null)
+              setStatus(tab.value)
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <Message>{error}</Message>
+
+      {items === null ? (
+        <Spinner label="Loading suggestions" />
+      ) : items.length === 0 ? (
+        <p className="muted">Nothing here yet.</p>
+      ) : (
+        <ul className="suggestion-list">
+          {items.map((item) => (
+            <li key={item.id} className="panel suggestion">
+              <div className="suggestion-head">
+                <span className={`pill suggestion-${item.category.toLowerCase()}`}>
+                  {CATEGORY_LABELS[item.category] ?? item.category}
+                </span>
+                <span className="muted">
+                  {item.memberName
+                    ? `${item.memberName} · ${item.memberEmail}`
+                    : item.email
+                      ? `Guest · ${item.email}`
+                      : 'Guest'}
+                  {item.page && ` · on ${item.page}`} · {ago(item.createdAt, now)}
+                </span>
+              </div>
+              <p className="suggestion-text">{item.message}</p>
+              <div className="form-actions">
+                {status !== 'PLANNED' && (
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => move(item, 'PLANNED')}>
+                    Plan it
+                  </button>
+                )}
+                {status !== 'DONE' && (
+                  <button type="button" className="btn btn-primary btn-sm" onClick={() => move(item, 'DONE')}>
+                    Mark done
+                  </button>
+                )}
+                {status !== 'DISMISSED' && (
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => move(item, 'DISMISSED')}>
+                    Dismiss
+                  </button>
+                )}
+                {status !== 'NEW' && (
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => move(item, 'NEW')}>
+                    Back to new
+                  </button>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   )
 }
 

@@ -5,6 +5,11 @@ import { useCallback, useEffect, useState } from 'react'
  * would add a dependency without adding anything the pages need.
  */
 export function navigate(path, { replace = false, state = {}, scroll = true } = {}) {
+  // A newer release is live: switching pages is a natural moment to load it.
+  if (window.__handyaiUpdateReady && !replace) {
+    window.location.assign(path)
+    return
+  }
   if (replace) window.history.replaceState(state, '', path)
   else window.history.pushState(state, '', path)
   window.dispatchEvent(new PopStateEvent('popstate'))
